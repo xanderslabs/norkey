@@ -21,6 +21,7 @@ function fail(id: string, e: unknown): void {
   const known = e instanceof NoPrfError || e instanceof FlowError || e instanceof WrapError || e instanceof ApiError;
   const message = cancelled ? "User rejected the request." : known ? (e as Error).message : "Unexpected error.";
   if (!cancelled) {
+    if (!known) console.error("norkey:", e);
     showError(message);
     // Leave the message visible briefly so the user sees why, then return the error to the app.
     setTimeout(() => finish({ v: 1, id, ok: false, code: -32603, message }), 2500);

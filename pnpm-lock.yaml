@@ -21,6 +21,22 @@ importers:
         specifier: ^4.1.10
         version: 4.1.11(@types/node@24.19.1)(jsdom@26.1.0)(vite@8.3.2(@types/node@24.19.1))
 
+  examples/demo:
+    dependencies:
+      '@norkey/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      viem:
+        specifier: ^2.55.4
+        version: 2.57.3(typescript@7.0.2)
+    devDependencies:
+      playwright-core:
+        specifier: ^1.63.0
+        version: 1.63.0
+      vite:
+        specifier: ^8.1.5
+        version: 8.3.2(@types/node@24.19.1)
+
   packages/client:
     dependencies:
       viem:
@@ -740,6 +756,11 @@ packages:
   picomatch@4.0.7:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
+
+  playwright-core@1.63.0:
+    resolution: {integrity: sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   postcss@8.5.29:
     resolution: {integrity: sha512-49cGhUbXj8Qenv0iTMxA1cFBzxXoctpC9Ujd77t1WcbJIr6nF/eI7g/8MgxrYldFRuAXvja7xQRwavoW7kgrxQ==}
@@ -1560,6 +1581,8 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
+
+  playwright-core@1.63.0: {}
 
   postcss@8.5.29:
     dependencies:
