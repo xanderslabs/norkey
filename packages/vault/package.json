@@ -3,12 +3,21 @@
   "version": "0.0.0",
   "type": "module",
   "license": "MIT",
-  "bin": { "norkey-vault": "./dist/bin.js" },
+  "bin": {
+    "norkey-vault": "./dist/bin.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.page.json"
   },
-  "dependencies": { "@noble/curves": "^2.2.0", "viem": "^2.55.4", "vite": "^8.1.5" },
-  "devDependencies": { "jsdom": "^26.0.0" }
+  "dependencies": {
+    "@noble/curves": "^2.2.0",
+    "viem": "^2.55.4",
+    "vite": "^8.1.5"
+  },
+  "devDependencies": {
+    "@simplewebauthn/server": "^13.3.3",
+    "jsdom": "^26.0.0"
+  }
 }
