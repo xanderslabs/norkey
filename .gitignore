@@ -7,3 +7,4 @@ coverage
 .env.local
 *.tsbuildinfo
 .DS_Store
+dist-vault
