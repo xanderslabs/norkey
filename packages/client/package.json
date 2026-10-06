@@ -4,6 +4,13 @@
   "type": "module",
   "license": "MIT",
   "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
     "./protocol": "./src/protocol.ts"
-  }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "echo 'no tests in @norkey/client (slice 1 plan)'",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": { "viem": "^2.55.4" }
 }
