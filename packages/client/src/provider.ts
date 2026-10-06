@@ -66,9 +66,15 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
     }
     return c;
   };
-  const ask = async <K extends PopupRequest["kind"]>(req: PopupRequest & { kind: K }) => {
-    const reply: PopupReply = await openPopup(config.vaultOrigin, req);
+  // Opens the popup synchronously (see openPopup), so call `ask` before awaiting anything.
+  const ask = async <K extends PopupRequest["kind"]>(
+    kind: K,
+    prepare: (id: string) => Promise<PopupRequest & { kind: K }>,
+  ) => {
+    const id = crypto.randomUUID();
+    const reply: PopupReply = await openPopup(config.vaultOrigin, id, () => prepare(id));
     if (!reply.ok) throw new ProviderRpcError(reply.code, reply.message);
+    if (reply.kind !== kind) throw new ProviderRpcError(-32603, "The wallet replied to a different request.");
     return reply as Extract<PopupReply, { ok: true; kind: K }>;
   };
 
@@ -79,25 +85,29 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
     }
     if (!tx.to) throw new ProviderRpcError(-32602, "Contract creation is not supported.");
     const client = reader();
+    const to = tx.to;
+    const from = address;
     const value = tx.value ? BigInt(tx.value) : 0n;
     const data = tx.data ?? "0x";
-    const [nonce, gas, fees] = await Promise.all([
-      client.getTransactionCount({ address, blockTag: "pending" }),
-      client.estimateGas({ account: address, to: tx.to, value, data }),
-      client.estimateFeesPerGas(),
-    ]);
-    const prepared: PreparedTx = {
-      chainId,
-      from: address,
-      to: tx.to,
-      value: numberToHex(value),
-      data,
-      nonce,
-      gas: numberToHex(gas),
-      maxFeePerGas: numberToHex(fees.maxFeePerGas),
-      maxPriorityFeePerGas: numberToHex(fees.maxPriorityFeePerGas),
-    };
-    const { raw } = await ask({ v: 1, id: crypto.randomUUID(), kind: "sign-tx", tx: prepared });
+    const { raw } = await ask("sign-tx", async (id) => {
+      const [nonce, gas, fees] = await Promise.all([
+        client.getTransactionCount({ address: from, blockTag: "pending" }),
+        client.estimateGas({ account: from, to, value, data }),
+        client.estimateFeesPerGas(),
+      ]);
+      const prepared: PreparedTx = {
+        chainId,
+        from,
+        to,
+        value: numberToHex(value),
+        data,
+        nonce,
+        gas: numberToHex(gas),
+        maxFeePerGas: numberToHex(fees.maxFeePerGas),
+        maxPriorityFeePerGas: numberToHex(fees.maxPriorityFeePerGas),
+      };
+      return { v: 1, id, kind: "sign-tx", tx: prepared };
+    });
     return client.sendRawTransaction({ serializedTransaction: raw });
   }
 
@@ -109,7 +119,7 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
         return address ? [address] : [];
       case "eth_requestAccounts": {
         if (address) return [address];
-        const reply = await ask({ v: 1, id: crypto.randomUUID(), kind: "connect" });
+        const reply = await ask("connect", async (id) => ({ v: 1, id, kind: "connect" }));
         address = reply.address;
         save(address);
         emit("connect", { chainId: numberToHex(chainId) });

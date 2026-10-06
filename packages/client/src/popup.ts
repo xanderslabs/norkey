@@ -5,14 +5,18 @@ import type { PopupReply, PopupRequest } from "./protocol.js";
 const POPUP_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
- * Open the boundary page as a popup, send `req`, and resolve with its reply.
+ * Open the boundary page as a popup, send the request `prepare` resolves to, and resolve with the reply.
  *
- * Replies are accepted only from the exact window this call opened (`event.source === popup`) and
- * only from the vault origin. The request is re-sent when the popup announces `ready`, because a
- * message posted before the popup's listener exists is lost. Must be called inside a user gesture,
- * or the browser blocks the popup.
+ * The popup opens synchronously, before `prepare` runs: browsers allow `window.open` only while the
+ * click's user activation lasts, and preparing a transaction takes RPC round trips that can outlast
+ * it. The request is posted once both the request is ready and the popup has announced `ready` (a
+ * message posted before the popup's listener exists is lost). If `prepare` fails, the popup closes
+ * and its error is returned.
+ *
+ * Replies are accepted only from the exact window this call opened (`event.source === popup`), only
+ * from the vault origin, and only with the request's id.
  */
-export function openPopup(vaultOrigin: string, req: PopupRequest): Promise<PopupReply> {
+export function openPopup(vaultOrigin: string, id: string, prepare: () => Promise<PopupRequest>): Promise<PopupReply> {
   const parsed = new URL(vaultOrigin);
   const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
   if (parsed.protocol !== "https:" && !isLocalhost) {
@@ -25,6 +29,8 @@ export function openPopup(vaultOrigin: string, req: PopupRequest): Promise<Popup
 
   return new Promise<PopupReply>((resolve, reject) => {
     let settled = false;
+    let req: PopupRequest | null = null;
+    let ready = false;
 
     function cleanup(): void {
       settled = true;
@@ -34,15 +40,20 @@ export function openPopup(vaultOrigin: string, req: PopupRequest): Promise<Popup
       popup?.close();
     }
 
+    function send(): void {
+      if (req && ready && !settled) popup?.postMessage(req, expectedOrigin);
+    }
+
     function handler(event: MessageEvent): void {
       if (event.source !== popup || event.origin !== expectedOrigin) return;
       const data = event.data as { v?: unknown; kind?: unknown; id?: unknown } | null;
       if (typeof data !== "object" || data === null || data.v !== 1) return;
       if (data.kind === "ready") {
-        popup?.postMessage(req, expectedOrigin);
+        ready = true;
+        send();
         return;
       }
-      if (data.id !== req.id) return;
+      if (data.id !== id) return;
       cleanup();
       resolve(event.data as PopupReply);
     }
@@ -65,6 +76,16 @@ export function openPopup(vaultOrigin: string, req: PopupRequest): Promise<Popup
     }, 500);
 
     window.addEventListener("message", handler);
-    popup.postMessage(req, expectedOrigin);
+    prepare().then(
+      (r) => {
+        req = r;
+        send();
+      },
+      (e: unknown) => {
+        if (settled) return;
+        cleanup();
+        reject(e);
+      },
+    );
   });
 }
