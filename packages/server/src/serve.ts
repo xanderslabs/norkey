@@ -23,27 +23,39 @@ const handler = createNorKeyHandler({
 const port = Number(process.env.NORKEY_PORT ?? 8787);
 
 createServer(async (req, res) => {
-  const chunks: Buffer[] = [];
-  for await (const c of req) chunks.push(c as Buffer);
-  const headers = new Headers();
-  for (const [k, v] of Object.entries(req.headers)) {
-    if (typeof v === "string") headers.set(k, v);
-    else if (Array.isArray(v)) for (const item of v) headers.append(k, item);
+  // One malformed request must never take the process down: answer it and move on.
+  try {
+    const chunks: Buffer[] = [];
+    for await (const c of req) chunks.push(c as Buffer);
+    const headers = new Headers();
+    for (const [k, v] of Object.entries(req.headers)) {
+      if (typeof v === "string") headers.set(k, v);
+      else if (Array.isArray(v)) for (const item of v) headers.append(k, item);
+    }
+    const hasBody = req.method !== "GET" && req.method !== "HEAD" && chunks.length > 0;
+    let request: Request;
+    try {
+      request = new Request(`http://${req.headers.host ?? "localhost"}${req.url}`, {
+        method: req.method,
+        headers,
+        body: hasBody ? Buffer.concat(chunks) : undefined,
+      });
+    } catch {
+      res.writeHead(400, { "content-type": "application/json" }).end('{"error":"bad request"}');
+      return;
+    }
+    const response = await handler(request);
+    const out: Record<string, string | string[]> = {};
+    response.headers.forEach((value, key) => {
+      if (key !== "set-cookie") out[key] = value;
+    });
+    const cookies = response.headers.getSetCookie();
+    if (cookies.length) out["set-cookie"] = cookies;
+    res.writeHead(response.status, out);
+    res.end(Buffer.from(await response.arrayBuffer()));
+  } catch (e) {
+    console.error("norkey serve:", e);
+    if (!res.headersSent) res.writeHead(500, { "content-type": "application/json" });
+    res.end('{"error":"internal error"}');
   }
-  const hasBody = req.method !== "GET" && req.method !== "HEAD" && chunks.length > 0;
-  const response = await handler(
-    new Request(`http://${req.headers.host ?? "localhost"}${req.url}`, {
-      method: req.method,
-      headers,
-      body: hasBody ? Buffer.concat(chunks) : undefined,
-    }),
-  );
-  const out: Record<string, string | string[]> = {};
-  response.headers.forEach((value, key) => {
-    if (key !== "set-cookie") out[key] = value;
-  });
-  const cookies = response.headers.getSetCookie();
-  if (cookies.length) out["set-cookie"] = cookies;
-  res.writeHead(response.status, out);
-  res.end(Buffer.from(await response.arrayBuffer()));
 }).listen(port, () => console.log(`norkey listening on :${port}`));
