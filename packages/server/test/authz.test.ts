@@ -2,8 +2,16 @@
 // another user, and to refuse writes without a session. A wrap is ciphertext, but serving it to the
 // wrong user still breaks the "only your passkey opens your wallet" boundary and enables row swaps.
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { loginVerify } from "../src/auth/passkey.js";
 import { createNorKeyHandler, sqlite } from "../src/index.js";
+
+// Only the test below drives POST /login/verify; WebAuthn itself cannot run here, so its result is
+// supplied. The handler's own wallet and wrap lookups run for real.
+vi.mock("../src/auth/passkey.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/auth/passkey.js")>()),
+  loginVerify: vi.fn(),
+}));
 
 const origin = "http://localhost:5174";
 async function setup() {
@@ -74,16 +82,29 @@ describe("server authorization", () => {
     expect(res.status).toBe(404);
   });
 
-  it("does not give a second user the first user's wrap through storage lookups", async () => {
-    const { storage, call, login } = await setup();
+  it("does not return the first user's wrap when a second user logs in with that credential id", async () => {
+    const { call, login } = await setup();
     const alice = await login("alice", "cred-alice");
-    await login("bob", "cred-bob");
-    await call("/wallet", {
+    const bob = await login("bob", "cred-bob");
+    for (const [cookie, cred, n] of [
+      [alice, "cred-alice", 4],
+      [bob, "cred-bob", 7],
+    ] as const) {
+      await call("/wallet", {
+        method: "POST",
+        cookie,
+        body: JSON.stringify({ address: addr(n), wrap: wrapFor(cred) }),
+      });
+    }
+    vi.mocked(loginVerify).mockResolvedValueOnce({ userId: "bob", credentialId: "cred-alice" });
+    const res = await call("/login/verify", {
       method: "POST",
-      cookie: alice,
-      body: JSON.stringify({ address: addr(4), wrap: wrapFor("cred-alice") }),
+      body: JSON.stringify({ challengeId: "x", response: {} }),
     });
-    expect(await storage.getWrap("bob", "cred-alice")).toBeNull();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { wallet: { address: string } | null; wrap: unknown };
+    expect(body.wallet?.address).toBe(addr(7));
+    expect(body.wrap).toBeNull();
   });
 
   it("allows one wallet per user", async () => {

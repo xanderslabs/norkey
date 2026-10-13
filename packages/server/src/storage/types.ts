@@ -19,6 +19,8 @@ export type StoredCredential = {
 export interface NorKeyStorage {
   createUser(userId: string): Promise<void>;
   addCredential(c: StoredCredential): Promise<void>;
+  /** The user row and its first credential in one transaction: both or neither. */
+  createUserWithCredential(c: StoredCredential): Promise<void>;
   getCredential(credentialId: string): Promise<StoredCredential | null>;
   setSignCount(credentialId: string, signCount: number): Promise<void>;
   putChallenge(c: { id: string; challenge: string; userId: string | null; expiresAt: number }): Promise<void>;

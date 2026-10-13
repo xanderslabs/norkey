@@ -64,8 +64,7 @@ export async function registerVerify(
   }
   if (!verification.verified || !verification.registrationInfo) throw new AuthError();
   const { credential } = verification.registrationInfo;
-  await config.storage.createUser(stored.userId);
-  await config.storage.addCredential({
+  await config.storage.createUserWithCredential({
     credentialId: credential.id,
     userId: stored.userId,
     publicKey: credential.publicKey,

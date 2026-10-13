@@ -44,6 +44,19 @@ export function sqlite(path: string): NorKeyStorage {
         "INSERT INTO credentials (credential_id, user_id, public_key, sign_count, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)",
       ).run(c.credentialId, c.userId, c.publicKey, c.signCount, JSON.stringify(c.transports), Date.now());
     },
+    async createUserWithCredential(c) {
+      db.exec("BEGIN");
+      try {
+        db.prepare("INSERT INTO users (id, created_at) VALUES (?, ?)").run(c.userId, Date.now());
+        db.prepare(
+          "INSERT INTO credentials (credential_id, user_id, public_key, sign_count, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        ).run(c.credentialId, c.userId, c.publicKey, c.signCount, JSON.stringify(c.transports), Date.now());
+        db.exec("COMMIT");
+      } catch (e) {
+        db.exec("ROLLBACK");
+        throw e;
+      }
+    },
     async getCredential(credentialId) {
       const r = db.prepare("SELECT * FROM credentials WHERE credential_id = ?").get(credentialId) as Row | undefined;
       if (!r) return null;
@@ -59,6 +72,7 @@ export function sqlite(path: string): NorKeyStorage {
       db.prepare("UPDATE credentials SET sign_count = ? WHERE credential_id = ?").run(signCount, credentialId);
     },
     async putChallenge(c) {
+      db.prepare("DELETE FROM challenges WHERE expires_at < ?").run(Date.now());
       db.prepare("INSERT INTO challenges (id, challenge, user_id, expires_at) VALUES (?, ?, ?, ?)").run(
         c.id,
         c.challenge,
@@ -72,6 +86,7 @@ export function sqlite(path: string): NorKeyStorage {
       return { challenge: r.challenge as string, userId: (r.user_id as string | null) ?? null };
     },
     async createSession(s) {
+      db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(Date.now());
       db.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").run(
         s.tokenHash,
         s.userId,
