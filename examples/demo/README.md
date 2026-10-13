@@ -21,7 +21,7 @@ Then start three processes from the repo root.
 2. The boundary page:
 
    ```sh
-   node packages/vault/dist/bin.js build --rp-id localhost --api http://localhost:8787/norkey --app-origin http://localhost:5173
+   node packages/vault/dist/bin.js build --rp-id localhost --api http://localhost:8787/norkey --app-origin http://localhost:5173 --chains 11155111
    node packages/vault/dist/bin.js serve --port 5174
    ```
 

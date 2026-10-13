@@ -31,7 +31,7 @@ describe("boundary guardrails", () => {
     const opener = { postMessage: vi.fn() };
     vi.stubGlobal("window", { opener, addEventListener: vi.fn() });
     const { acceptRequest } = await import("../page/channel.js");
-    const request = { v: 1, id: "x", kind: "connect" };
+    const request = { v: 2, id: "x", kind: "connect" };
     const evil = acceptRequest({ origin: "https://evil.example", source: opener, data: request } as never, [
       "https://app.example",
     ]);

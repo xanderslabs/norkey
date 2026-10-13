@@ -1,9 +1,18 @@
 import { type Address, createPublicClient, fallback, type Hex, http, numberToHex, type PublicClient } from "viem";
+import { CALIBUR_ADDRESS, type Call, isDelegatedTo } from "./calibur.js";
 import { ProviderRpcError } from "./errors.js";
+import { estimateCallsGas } from "./gas.js";
 import { openPopup } from "./popup.js";
-import type { PopupReply, PopupRequest, PreparedTx } from "./protocol.js";
+import { MAX_CALLS, type PopupReply, type PopupRequest, PROTOCOL_VERSION } from "./protocol.js";
 
-export type NorKeyChain = { id: number; rpcUrls: string[]; gas: "native" };
+export type NorKeyChain = {
+  id: number;
+  rpcUrls: string[];
+  gas: "native";
+  /** The delegate this provider checks for. Default: Uniswap's Calibur. The boundary page signs only
+   *  for the address in its own build config, so this setting cannot redirect a delegation. */
+  calibur?: Address;
+};
 
 export type NorKeyProviderConfig = {
   /** The boundary page origin, e.g. "https://accounts.app.com". */
@@ -18,8 +27,10 @@ export type Eip1193Provider = {
   removeListener(event: string, listener: (...args: unknown[]) => void): void;
 };
 
+type CallInput = { to?: Address; value?: Hex; data?: Hex };
+
 const ADDRESS_KEY = "norkey:address";
-const SIGNING_METHODS = new Set(["personal_sign", "eth_sign", "eth_signTypedData_v4", "wallet_sendCalls"]);
+const UNSUPPORTED = new Set(["personal_sign", "eth_sign", "eth_signTypedData_v4", "wallet_showCallsStatus"]);
 
 function validate(config: NorKeyProviderConfig): void {
   if (new URL(config.vaultOrigin).origin !== config.vaultOrigin) {
@@ -57,12 +68,12 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
   const emit = (event: string, ...args: unknown[]) => {
     for (const l of [...(listeners.get(event) ?? [])]) l(...args);
   };
-  const reader = (): PublicClient => {
-    let c = clients.get(chainId);
+  const chainOf = (id: number): NorKeyChain => config.chains.find((x) => x.id === id) as NorKeyChain;
+  const readerFor = (id: number): PublicClient => {
+    let c = clients.get(id);
     if (!c) {
-      const chain = config.chains.find((x) => x.id === chainId) as NorKeyChain;
-      c = createPublicClient({ transport: fallback(chain.rpcUrls.map((u) => http(u))) }) as PublicClient;
-      clients.set(chainId, c);
+      c = createPublicClient({ transport: fallback(chainOf(id).rpcUrls.map((u) => http(u))) }) as PublicClient;
+      clients.set(id, c);
     }
     return c;
   };
@@ -78,37 +89,50 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
     return reply as Extract<PopupReply, { ok: true; kind: K }>;
   };
 
-  async function sendTransaction(params: unknown[]): Promise<Hex> {
-    const tx = (params[0] ?? {}) as { from?: string; to?: Address; value?: Hex; data?: Hex };
-    if (!address || tx.from?.toLowerCase() !== address.toLowerCase()) {
+  /** The one send path for eth_sendTransaction and wallet_sendCalls. Nothing here awaits before
+   *  `ask`, so the popup opens inside the click's user activation. */
+  async function sendCalls(from: string | undefined, input: CallInput[]): Promise<{ chainId: number; hash: Hex }> {
+    if (!address || from?.toLowerCase() !== address.toLowerCase()) {
       throw new ProviderRpcError(4100, "The requested account is not connected.");
     }
-    if (!tx.to) throw new ProviderRpcError(-32602, "Contract creation is not supported.");
-    const client = reader();
-    const to = tx.to;
-    const from = address;
-    const value = tx.value ? BigInt(tx.value) : 0n;
-    const data = tx.data ?? "0x";
-    const { raw } = await ask("sign-tx", async (id) => {
-      const [nonce, gas, fees] = await Promise.all([
-        client.getTransactionCount({ address: from, blockTag: "pending" }),
-        client.estimateGas({ account: from, to, value, data }),
+    if (input.length === 0 || input.length > MAX_CALLS) {
+      throw new ProviderRpcError(-32602, `Send between 1 and ${MAX_CALLS} calls.`);
+    }
+    if (input.some((c) => !c.to)) throw new ProviderRpcError(-32602, "Contract creation is not supported.");
+    const sender = address;
+    const id = chainId;
+    const client = readerFor(id);
+    const calibur = chainOf(id).calibur ?? CALIBUR_ADDRESS;
+    const calls: Call[] = input.map((c) => ({
+      to: c.to as Address,
+      value: c.value ? BigInt(c.value) : 0n,
+      data: c.data ?? "0x",
+    }));
+    const { raw } = await ask("sign-calls", async (rid) => {
+      const [code, nonce, fees] = await Promise.all([
+        client.getCode({ address: sender }),
+        client.getTransactionCount({ address: sender, blockTag: "pending" }),
         client.estimateFeesPerGas(),
       ]);
-      const prepared: PreparedTx = {
-        chainId,
-        from,
-        to,
-        value: numberToHex(value),
-        data,
-        nonce,
-        gas: numberToHex(gas),
-        maxFeePerGas: numberToHex(fees.maxFeePerGas),
-        maxPriorityFeePerGas: numberToHex(fees.maxPriorityFeePerGas),
+      const delegate = !isDelegatedTo(code, calibur);
+      const gas = await estimateCallsGas(client, { from: sender, calls, delegate, calibur });
+      return {
+        v: PROTOCOL_VERSION,
+        id: rid,
+        kind: "sign-calls",
+        calls: {
+          chainId: id,
+          from: sender,
+          calls: calls.map((c) => ({ to: c.to, value: numberToHex(c.value), data: c.data })),
+          nonce,
+          gas: numberToHex(gas),
+          maxFeePerGas: numberToHex(fees.maxFeePerGas),
+          maxPriorityFeePerGas: numberToHex(fees.maxPriorityFeePerGas),
+          delegate,
+        },
       };
-      return { v: 1, id, kind: "sign-tx", tx: prepared };
     });
-    return client.sendRawTransaction({ serializedTransaction: raw });
+    return { chainId: id, hash: await client.sendRawTransaction({ serializedTransaction: raw }) };
   }
 
   async function request({ method, params = [] }: { method: string; params?: unknown[] }): Promise<unknown> {
@@ -119,7 +143,7 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
         return address ? [address] : [];
       case "eth_requestAccounts": {
         if (address) return [address];
-        const reply = await ask("connect", async (id) => ({ v: 1, id, kind: "connect" }));
+        const reply = await ask("connect", async (id) => ({ v: PROTOCOL_VERSION, id, kind: "connect" }));
         address = reply.address;
         save(address);
         emit("connect", { chainId: numberToHex(chainId) });
@@ -135,11 +159,13 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
         }
         return null;
       }
-      case "eth_sendTransaction":
-        return sendTransaction(params);
+      case "eth_sendTransaction": {
+        const tx = (params[0] ?? {}) as CallInput & { from?: string };
+        return (await sendCalls(tx.from, [tx])).hash;
+      }
       default:
-        if (SIGNING_METHODS.has(method)) throw new ProviderRpcError(4200, `${method} is not supported yet`);
-        return reader().request({ method, params } as never);
+        if (UNSUPPORTED.has(method)) throw new ProviderRpcError(4200, `${method} is not supported yet`);
+        return readerFor(chainId).request({ method, params } as never);
     }
   }
 

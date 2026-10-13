@@ -1,5 +1,5 @@
 import { ProviderRpcError } from "./errors.js";
-import type { PopupReply, PopupRequest } from "./protocol.js";
+import { type PopupReply, type PopupRequest, PROTOCOL_VERSION } from "./protocol.js";
 
 /** How long to wait for the popup to reply before giving up. */
 const POPUP_TIMEOUT_MS = 5 * 60 * 1000;
@@ -47,7 +47,7 @@ export function openPopup(vaultOrigin: string, id: string, prepare: () => Promis
     function handler(event: MessageEvent): void {
       if (event.source !== popup || event.origin !== expectedOrigin) return;
       const data = event.data as { v?: unknown; kind?: unknown; id?: unknown } | null;
-      if (typeof data !== "object" || data === null || data.v !== 1) return;
+      if (typeof data !== "object" || data === null || data.v !== PROTOCOL_VERSION) return;
       if (data.kind === "ready") {
         ready = true;
         send();

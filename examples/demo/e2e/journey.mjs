@@ -48,6 +48,9 @@ const rpc = (method, params) =>
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
   }).then((r) => r.json());
+const latestTx = async () => (await rpc("eth_getBlockByNumber", ["latest", true])).result.transactions[0];
+const CALIBUR = "0x000000005c84F8Fd50b21CAC312528A64437030e";
+const DESIGNATOR = `0xef0100${CALIBUR.slice(2)}`.toLowerCase();
 
 let browser;
 try {
@@ -67,6 +70,8 @@ try {
     "http://localhost:8787/norkey",
     "--app-origin",
     "http://localhost:5173",
+    "--chains",
+    "11155111",
     "--out",
     vaultDir,
   ]);
@@ -170,6 +175,7 @@ try {
   await page.fill("#to", to);
   await page.fill("#amount", "0.0001");
   await page.click("#send");
+  await wallet().getByText("upgrades your wallet").waitFor();
   await wallet().getByText("Approve with passkey").click();
   await page.waitForFunction(() => document.getElementById("log")?.textContent?.includes("confirmed"), null, {
     timeout: 60000,
@@ -178,6 +184,9 @@ try {
   assert.equal(after - before, 100000000000000n);
   assert.match(await logText(), /\(success\)/);
   console.log("4. sent 0.0001 ETH, receipt success, recipient balance +0.0001");
+  assert.equal((await rpc("eth_getCode", [address, "latest"])).result.toLowerCase(), DESIGNATOR);
+  assert.equal((await latestTx()).type, "0x4");
+  console.log("4b. first send delegated the EOA to Calibur (type 4)");
 
   // 5. Forget the address in the app, reconnect with the existing passkey.
   await page.evaluate(() => localStorage.removeItem("norkey:address"));

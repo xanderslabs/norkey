@@ -1,7 +1,7 @@
-import type { PreparedTx } from "@norkey/client/protocol";
+import type { PreparedCalls } from "@norkey/client/protocol";
 import type { Address, Hex } from "viem";
 import type { Api } from "./api.js";
-import { accountFromKey } from "./key-account.js";
+import { signPreparedCalls } from "./calls.js";
 import { createPasskey, getPasskey } from "./passkey.js";
 import { addressOf, generateWalletKey, unwrapKey, wrapKey } from "./wrap.js";
 
@@ -94,14 +94,14 @@ export async function connectExisting(api: Api): Promise<{ address: Address }> {
   }
 }
 
-export async function signTx(api: Api, tx: PreparedTx): Promise<{ raw: Hex }> {
+export async function signCalls(api: Api, p: PreparedCalls, calibur: Address): Promise<{ raw: Hex }> {
   const lo = await api.loginOptions(recalledCredential());
   const got = await getPasskey(lo.options);
   let key: Uint8Array | undefined;
   try {
     const res = await api.loginVerify(lo.challengeId, got.response);
     if (!res.wallet || !res.wrap) throw new FlowError("This passkey cannot sign for this wallet.");
-    if (res.wallet.address.toLowerCase() !== tx.from.toLowerCase()) {
+    if (res.wallet.address.toLowerCase() !== p.from.toLowerCase()) {
       throw new FlowError("This passkey opens a different wallet than the one the app asked for.");
     }
     key = await unwrapKey({
@@ -110,18 +110,7 @@ export async function signTx(api: Api, tx: PreparedTx): Promise<{ raw: Hex }> {
       userId: res.userId,
       address: res.wallet.address,
     });
-    const account = accountFromKey(key);
-    const raw = await account.signTransaction({
-      type: "eip1559",
-      chainId: tx.chainId,
-      to: tx.to,
-      value: BigInt(tx.value),
-      data: tx.data,
-      nonce: tx.nonce,
-      gas: BigInt(tx.gas),
-      maxFeePerGas: BigInt(tx.maxFeePerGas),
-      maxPriorityFeePerGas: BigInt(tx.maxPriorityFeePerGas),
-    });
+    const raw = await signPreparedCalls(key, p, calibur);
     rememberCredential(got.response.id);
     return { raw };
   } finally {

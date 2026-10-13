@@ -5,7 +5,8 @@
   "license": "MIT",
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./protocol": "./src/protocol.ts"
+    "./protocol": "./src/protocol.ts",
+    "./calibur": "./src/calibur.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

@@ -15,3 +15,4 @@ p { margin: 0 0 16px; }
 button { display: block; width: 100%; padding: 12px; margin-bottom: 8px; border-radius: 8px; font: inherit; cursor: pointer; }
 button.primary { background: var(--accent); color: var(--bg); border: 0; }
 button.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.notice { padding: 10px 12px; border: 1px solid #b7791f; border-radius: 6px; background: #fffaf0; }

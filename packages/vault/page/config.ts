@@ -4,6 +4,8 @@ export type PageConfig = {
   rpName: string;
   apiUrl: string;
   appOrigins: string[];
+  /** The chains this page signs for, each with the only address it will delegate to. */
+  chains: { id: number; calibur: `0x${string}` }[];
 };
 
 export function readConfig(): PageConfig {

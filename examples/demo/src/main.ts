@@ -52,6 +52,8 @@ $("send").addEventListener("click", async () => {
     log(`sent ${hash} https://sepolia.etherscan.io/tx/${hash}`);
     const receipt = await reader.waitForTransactionReceipt({ hash });
     log(`confirmed in block ${receipt.blockNumber} (${receipt.status})`);
+    const sent = await reader.getTransaction({ hash });
+    log(`type ${sent.type}${sent.type === "eip7702" ? " (first send on this chain: delegated to Calibur)" : ""}`);
     await refresh();
   } catch (e) {
     report(e);

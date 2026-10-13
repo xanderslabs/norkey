@@ -1,8 +1,9 @@
-import type { PopupReply, PopupRequest } from "@norkey/client/protocol";
+import { type PopupReply, type PopupRequest, PROTOCOL_VERSION, type PreparedCalls } from "@norkey/client/protocol";
 import { ApiError, createApi } from "./api.js";
+import { RequestError, validateCalls } from "./calls.js";
 import { acceptRequest, announceReady, reply } from "./channel.js";
-import { readConfig } from "./config.js";
-import { connectCreate, connectExisting, FlowError, signTx } from "./flows.js";
+import { type PageConfig, readConfig } from "./config.js";
+import { connectCreate, connectExisting, FlowError, signCalls } from "./flows.js";
 import { CancelledError, NoPrfError, PasskeyError } from "./passkey.js";
 import { showBusy, showConnect, showConsent, showError, showWaiting } from "./view.js";
 import { WrapError } from "./wrap.js";
@@ -19,7 +20,7 @@ function finish(r: PopupReply): void {
 function fail(id: string, e: unknown): void {
   const cancelled = (e instanceof DOMException && e.name === "NotAllowedError") || e instanceof CancelledError;
   if (cancelled) {
-    finish({ v: 1, id, ok: false, code: 4001, message: "User rejected the request." });
+    finish({ v: PROTOCOL_VERSION, id, ok: false, code: 4001, message: "User rejected the request." });
     return;
   }
   const known =
@@ -27,15 +28,18 @@ function fail(id: string, e: unknown): void {
     e instanceof PasskeyError ||
     e instanceof FlowError ||
     e instanceof WrapError ||
-    e instanceof ApiError;
+    e instanceof ApiError ||
+    e instanceof RequestError;
   const message = known ? (e as Error).message : "Unexpected error.";
   if (!known) console.error("norkey:", e);
   showError(message);
+  const code = e instanceof RequestError ? -32602 : -32603;
   // Leave the message visible briefly so the user sees why, then return the error to the app.
-  setTimeout(() => finish({ v: 1, id, ok: false, code: -32603, message }), 2500);
+  setTimeout(() => finish({ v: PROTOCOL_VERSION, id, ok: false, code, message }), 2500);
 }
 
-const reject = (id: string) => () => finish({ v: 1, id, ok: false, code: 4001, message: "User rejected the request." });
+const reject = (id: string) => () =>
+  finish({ v: PROTOCOL_VERSION, id, ok: false, code: 4001, message: "User rejected the request." });
 
 function handle(req: PopupRequest, origin: string): void {
   if (req.kind === "connect") {
@@ -43,7 +47,7 @@ function handle(req: PopupRequest, origin: string): void {
       showBusy("Waiting for your passkey...");
       try {
         const { address } = await flow();
-        finish({ v: 1, id: req.id, ok: true, kind: "connect", address });
+        finish({ v: PROTOCOL_VERSION, id: req.id, ok: true, kind: "connect", address });
       } catch (e) {
         fail(req.id, e);
       }
@@ -55,12 +59,21 @@ function handle(req: PopupRequest, origin: string): void {
     });
     return;
   }
-  showConsent(origin, req.tx, {
+  let calls: PreparedCalls;
+  try {
+    calls = validateCalls(req.calls, config.chains);
+  } catch (e) {
+    fail(req.id, e);
+    return;
+  }
+  // validateCalls guarantees the chain is in the map.
+  const calibur = (config.chains.find((c) => c.id === calls.chainId) as PageConfig["chains"][number]).calibur;
+  showConsent(origin, calls, calibur, {
     approve: async () => {
       showBusy("Waiting for your passkey...");
       try {
-        const { raw } = await signTx(api, req.tx);
-        finish({ v: 1, id: req.id, ok: true, kind: "sign-tx", raw });
+        const { raw } = await signCalls(api, calls, calibur);
+        finish({ v: PROTOCOL_VERSION, id: req.id, ok: true, kind: "sign-calls", raw });
       } catch (e) {
         fail(req.id, e);
       }

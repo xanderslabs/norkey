@@ -6,7 +6,13 @@ import { fileURLToPath } from "node:url";
 import { build as viteBuild } from "vite";
 import { buildCsp, headersFileContent, securityHeaders } from "./headers.js";
 
-export type BuildConfig = { rpId: string; rpName: string; apiUrl: string; appOrigins: string[] };
+export type BuildConfig = {
+  rpId: string;
+  rpName: string;
+  apiUrl: string;
+  appOrigins: string[];
+  chains: { id: number; calibur: `0x${string}` }[];
+};
 export type BuiltPage = { html: string; csp: string; headers: Record<string, string> };
 
 const MODULE_OPEN = '<script type="module">';

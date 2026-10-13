@@ -1,5 +1,6 @@
-import type { PreparedTx } from "@norkey/client/protocol";
+import type { PreparedCalls } from "@norkey/client/protocol";
 import { formatEther } from "viem";
+import { chainName, describeCall } from "./decode.js";
 
 const root = () => document.getElementById("app") as HTMLElement;
 
@@ -53,20 +54,40 @@ export function showConnect(origin: string, actions: { create: () => void; exist
   );
 }
 
-export function showConsent(origin: string, tx: PreparedTx, actions: { approve: () => void; reject: () => void }) {
-  const maxFee = BigInt(tx.gas) * BigInt(tx.maxFeePerGas);
-  const details = el("div", undefined, "details");
-  details.append(
-    row("Chain", String(tx.chainId)),
-    row("From", tx.from),
-    row("To", tx.to),
-    row("Amount", `${formatEther(BigInt(tx.value))} ETH`),
-    row("Max network fee", `${formatEther(maxFee)} ETH`),
-  );
-  const parts: Node[] = [el("h1", "Approve transaction"), el("p", `Requested by ${origin}`), details];
-  if (tx.data !== "0x") {
-    parts.push(el("p", "Unknown call data", "label"), el("pre", tx.data, "calldata"));
+export function showConsent(
+  origin: string,
+  p: PreparedCalls,
+  calibur: string,
+  actions: { approve: () => void; reject: () => void },
+) {
+  const name = chainName(p.chainId);
+  const many = p.calls.length > 1;
+  const header = el("div", undefined, "details");
+  header.append(row("Chain", `${name} (${p.chainId})`), row("From", p.from));
+  const parts: Node[] = [
+    el("h1", many ? `Approve ${p.calls.length} calls` : "Approve transaction"),
+    el("p", `Requested by ${origin}`),
+    header,
+  ];
+  if (p.delegate) {
+    parts.push(
+      el(
+        "p",
+        `This is your wallet's first transaction on ${name}. It also upgrades your wallet with Uniswap's Calibur contract (${calibur}), which lets it batch calls. The upgrade stays in place until it is replaced.`,
+        "notice",
+      ),
+    );
   }
-  parts.push(button("Approve with passkey", actions.approve, true), button("Reject", actions.reject));
+  p.calls.forEach((call, i) => {
+    const view = describeCall(call);
+    const box = el("div", undefined, "details");
+    box.append(el("p", many ? `${i + 1}. ${view.title}` : view.title, "label"));
+    for (const [label, value] of view.rows) box.append(row(label, value));
+    if (view.raw) box.append(el("pre", view.raw, "calldata"));
+    parts.push(box);
+  });
+  const fee = el("div", undefined, "details");
+  fee.append(row("Max network fee", `${formatEther(BigInt(p.gas) * BigInt(p.maxFeePerGas))} ETH`));
+  parts.push(fee, button("Approve with passkey", actions.approve, true), button("Reject", actions.reject));
   screen(...parts);
 }

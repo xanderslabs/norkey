@@ -1,5 +1,5 @@
 // The only module that talks to the opener. It never imports key material.
-import type { PopupReady, PopupReply, PopupRequest } from "@norkey/client/protocol";
+import { type PopupReady, type PopupReply, type PopupRequest, PROTOCOL_VERSION } from "@norkey/client/protocol";
 
 let requesterOrigin: string | null = null;
 
@@ -8,14 +8,14 @@ export function acceptRequest(event: MessageEvent, appOrigins: string[]): PopupR
   if (event.source !== window.opener) return null;
   if (!appOrigins.includes(event.origin)) return null;
   const d = event.data as Partial<PopupRequest> | null;
-  if (!d || d.v !== 1 || typeof d.id !== "string") return null;
-  if (d.kind !== "connect" && d.kind !== "sign-tx") return null;
+  if (!d || d.v !== PROTOCOL_VERSION || typeof d.id !== "string") return null;
+  if (d.kind !== "connect" && d.kind !== "sign-calls") return null;
   requesterOrigin = event.origin;
   return d as PopupRequest;
 }
 
 export function announceReady(appOrigins: string[]): void {
-  const ready: PopupReady = { v: 1, kind: "ready" };
+  const ready: PopupReady = { v: PROTOCOL_VERSION, kind: "ready" };
   for (const o of appOrigins) window.opener?.postMessage(ready, o);
 }
 
