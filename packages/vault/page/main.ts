@@ -3,7 +3,7 @@ import { ApiError, createApi } from "./api.js";
 import { acceptRequest, announceReady, reply } from "./channel.js";
 import { readConfig } from "./config.js";
 import { connectCreate, connectExisting, FlowError, signTx } from "./flows.js";
-import { NoPrfError } from "./passkey.js";
+import { CancelledError, NoPrfError, PasskeyError } from "./passkey.js";
 import { showBusy, showConnect, showConsent, showError, showWaiting } from "./view.js";
 import { WrapError } from "./wrap.js";
 
@@ -17,17 +17,22 @@ function finish(r: PopupReply): void {
 }
 
 function fail(id: string, e: unknown): void {
-  const cancelled = e instanceof DOMException && e.name === "NotAllowedError";
-  const known = e instanceof NoPrfError || e instanceof FlowError || e instanceof WrapError || e instanceof ApiError;
-  const message = cancelled ? "User rejected the request." : known ? (e as Error).message : "Unexpected error.";
-  if (!cancelled) {
-    if (!known) console.error("norkey:", e);
-    showError(message);
-    // Leave the message visible briefly so the user sees why, then return the error to the app.
-    setTimeout(() => finish({ v: 1, id, ok: false, code: -32603, message }), 2500);
+  const cancelled = (e instanceof DOMException && e.name === "NotAllowedError") || e instanceof CancelledError;
+  if (cancelled) {
+    finish({ v: 1, id, ok: false, code: 4001, message: "User rejected the request." });
     return;
   }
-  finish({ v: 1, id, ok: false, code: 4001, message });
+  const known =
+    e instanceof NoPrfError ||
+    e instanceof PasskeyError ||
+    e instanceof FlowError ||
+    e instanceof WrapError ||
+    e instanceof ApiError;
+  const message = known ? (e as Error).message : "Unexpected error.";
+  if (!known) console.error("norkey:", e);
+  showError(message);
+  // Leave the message visible briefly so the user sees why, then return the error to the app.
+  setTimeout(() => finish({ v: 1, id, ok: false, code: -32603, message }), 2500);
 }
 
 const reject = (id: string) => () => finish({ v: 1, id, ok: false, code: 4001, message: "User rejected the request." });

@@ -28,40 +28,70 @@ function recalledCredential(): string | undefined {
   }
 }
 
-export async function connectCreate(api: Api): Promise<{ address: Address }> {
-  const { challengeId, options } = await api.registerOptions();
-  const created = await createPasskey(options);
-  const { userId } = await api.registerVerify(challengeId, created.response);
-  let prf = created.prfOutput;
-  if (!prf) {
-    // No PRF at create: one immediate get on the same credential.
-    const lo = await api.loginOptions(created.response.id);
-    const got = await getPasskey(lo.options);
-    await api.loginVerify(lo.challengeId, got.response);
-    prf = got.prfOutput;
-  }
+/** Generate K, wrap it under this passkey's PRF output, and store the wallet. Zeroes K. */
+async function createWalletUnder(
+  api: Api,
+  a: { prfOutput: ArrayBuffer; credentialId: string; userId: string },
+): Promise<Address> {
   const key = generateWalletKey();
   try {
     const address = addressOf(key);
     // wrapKey zeroes `key` itself; the finally below is the second guard.
-    const wrap = await wrapKey({ key, prfOutput: prf, credentialId: created.response.id, userId, address });
+    const wrap = await wrapKey({
+      key,
+      prfOutput: a.prfOutput,
+      credentialId: a.credentialId,
+      userId: a.userId,
+      address,
+    });
     await api.createWallet(address, wrap);
+    return address;
+  } finally {
+    key.fill(0);
+  }
+}
+
+export async function connectCreate(api: Api): Promise<{ address: Address }> {
+  const { challengeId, options } = await api.registerOptions();
+  const created = await createPasskey(options);
+  let prf = created.prfOutput;
+  try {
+    const { userId } = await api.registerVerify(challengeId, created.response);
+    if (!prf) {
+      // No PRF at create: one immediate get on the same credential.
+      const lo = await api.loginOptions(created.response.id);
+      const got = await getPasskey(lo.options);
+      prf = got.prfOutput;
+      await api.loginVerify(lo.challengeId, got.response);
+    }
+    const address = await createWalletUnder(api, { prfOutput: prf, credentialId: created.response.id, userId });
     rememberCredential(created.response.id);
     return { address };
   } finally {
-    key.fill(0);
-    new Uint8Array(prf).fill(0);
+    if (prf) new Uint8Array(prf).fill(0);
   }
 }
 
 export async function connectExisting(api: Api): Promise<{ address: Address }> {
   const lo = await api.loginOptions(); // discoverable: the user picks
   const got = await getPasskey(lo.options);
-  new Uint8Array(got.prfOutput).fill(0); // connect needs no key
-  const res = await api.loginVerify(lo.challengeId, got.response);
-  if (!res.wallet) throw new FlowError("This passkey has no NorKey wallet here yet. Create one instead.");
-  rememberCredential(got.response.id);
-  return { address: res.wallet.address };
+  try {
+    const res = await api.loginVerify(lo.challengeId, got.response);
+    let address = res.wallet?.address;
+    if (!address) {
+      // A create that failed after registering this passkey left a user with no wallet. Finish setup
+      // with this gesture's PRF output instead of sending the user off to make a second passkey.
+      address = await createWalletUnder(api, {
+        prfOutput: got.prfOutput,
+        credentialId: got.response.id,
+        userId: res.userId,
+      });
+    }
+    rememberCredential(got.response.id);
+    return { address };
+  } finally {
+    new Uint8Array(got.prfOutput).fill(0);
+  }
 }
 
 export async function signTx(api: Api, tx: PreparedTx): Promise<{ raw: Hex }> {

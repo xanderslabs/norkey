@@ -54,15 +54,17 @@ export async function wrapKey(args: {
   userId: string;
   address: Address;
 }): Promise<Wrap> {
+  let plaintext: ArrayBuffer | undefined;
   try {
     const id = crypto.randomUUID();
     const salt = crypto.getRandomValues(new Uint8Array(32));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const kek = await deriveKek(args.prfOutput, salt);
+    plaintext = bytesToArrayBuffer(args.key);
     const ct = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv: bytesToArrayBuffer(iv), additionalData: associatedData(args.userId, args.address, id) },
       kek,
-      bytesToArrayBuffer(args.key),
+      plaintext,
     );
     return {
       id,
@@ -73,6 +75,7 @@ export async function wrapKey(args: {
       ciphertext: bytesToBase64Url(new Uint8Array(ct)),
     };
   } finally {
+    if (plaintext) new Uint8Array(plaintext).fill(0);
     args.key.fill(0);
   }
 }

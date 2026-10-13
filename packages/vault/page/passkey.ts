@@ -16,6 +16,22 @@ export class NoPrfError extends Error {
   }
 }
 
+/** The browser returned no credential: the user dismissed the prompt. Replies 4001. */
+export class CancelledError extends Error {
+  constructor() {
+    super("User rejected the request.");
+    this.name = "CancelledError";
+  }
+}
+
+/** A passkey problem the user should read, such as a passkey on another device. Replies -32603. */
+export class PasskeyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PasskeyError";
+  }
+}
+
 const CROSS_DEVICE_REJECTED = "This wallet's passkey is not on this device. Use a passkey saved on this device.";
 const LOCAL_HINTS = ["client-device"] as const;
 const prfExtension = { prf: { eval: { first: bytesToArrayBuffer(PRF_INPUT) } } };
@@ -89,7 +105,7 @@ export async function createPasskey(
       extensions: prfExtension as AuthenticationExtensionsClientInputs,
     },
   })) as PublicKeyCredential | null;
-  if (!credential) throw new Error("Passkey creation was cancelled");
+  if (!credential) throw new CancelledError();
   return { response: registrationJSON(credential), prfOutput: readPrf(credential) };
 }
 
@@ -108,8 +124,8 @@ export async function getPasskey(
       extensions: prfExtension,
     } as PublicKeyCredentialRequestOptions,
   })) as PublicKeyCredential | null;
-  if (!assertion) throw new Error("Passkey authentication was cancelled");
-  if (assertion.authenticatorAttachment === "cross-platform") throw new Error(CROSS_DEVICE_REJECTED);
+  if (!assertion) throw new CancelledError();
+  if (assertion.authenticatorAttachment === "cross-platform") throw new PasskeyError(CROSS_DEVICE_REJECTED);
   const prfOutput = readPrf(assertion);
   if (!prfOutput) throw new NoPrfError();
   return { response: authenticationJSON(assertion), prfOutput };
