@@ -188,7 +188,26 @@ try {
   assert.equal((await latestTx()).type, "0x4");
   console.log("4b. first send delegated the EOA to Calibur (type 4)");
 
-  // 5. Forget the address in the app, reconnect with the existing passkey.
+  // 5. A two-call batch on the now-delegated account: one gesture, a type-2 self-call, both paid.
+  const to2 = "0x000000000000000000000000000000000000cafE";
+  const bal = async (x) => BigInt((await rpc("eth_getBalance", [x, "latest"])).result);
+  const [b1, b2] = [await bal(to), await bal(to2)];
+  await page.fill("#to2", to2);
+  await page.click("#batch");
+  await wallet().getByText("Approve 2 calls").waitFor();
+  assert.equal(await wallet().getByText("upgrades your wallet").count(), 0);
+  await wallet().getByText("Approve with passkey").click();
+  await page.waitForFunction(() => document.getElementById("log")?.textContent?.includes("batch success"), null, {
+    timeout: 60000,
+  });
+  assert.equal((await bal(to)) - b1, 100000000000000n);
+  assert.equal((await bal(to2)) - b2, 100000000000000n);
+  const batchTx = await latestTx();
+  assert.equal(batchTx.type, "0x2");
+  assert.equal(batchTx.to.toLowerCase(), address.toLowerCase());
+  console.log("5. batch of 2 on a delegated account: type 2 self-call, both recipients paid, status success");
+
+  // 6. Forget the address in the app, reconnect with the existing passkey.
   await page.evaluate(() => localStorage.removeItem("norkey:address"));
   await page.reload();
   await page.click("#connect");
@@ -197,7 +216,7 @@ try {
     timeout: 30000,
   });
   assert.equal(await page.locator("#address").textContent(), address);
-  console.log("5. reconnected to the same address");
+  console.log("6. reconnected to the same address");
   console.log("JOURNEY PASS");
 } catch (e) {
   console.error("JOURNEY FAIL:", e);

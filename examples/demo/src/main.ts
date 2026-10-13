@@ -60,6 +60,30 @@ $("send").addEventListener("click", async () => {
   }
 });
 
+$("batch").addEventListener("click", async () => {
+  if (!account) return log("connect first");
+  try {
+    const value = parseEther(($("amount") as HTMLInputElement).value.trim());
+    const recipients = [($("to") as HTMLInputElement).value.trim(), ($("to2") as HTMLInputElement).value.trim()];
+    const { id } = await wallet.sendCalls({
+      account,
+      chain: sepolia,
+      calls: recipients.map((to) => ({ to: to as Address, value })),
+    });
+    log(`batch ${id}`);
+    const status = await wallet.waitForCallsStatus({ id });
+    const hash = status.receipts?.[0]?.transactionHash;
+    log(`batch ${status.status} in block ${status.receipts?.[0]?.blockNumber}`);
+    if (hash) {
+      const sent = await reader.getTransaction({ hash });
+      log(`type ${sent.type}${sent.type === "eip7702" ? " (first send on this chain: delegated to Calibur)" : ""}`);
+    }
+    await refresh();
+  } catch (e) {
+    report(e);
+  }
+});
+
 (async () => {
   const [existing] = (await norkey.request({ method: "eth_accounts" })) as Address[];
   if (existing) {

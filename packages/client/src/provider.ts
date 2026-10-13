@@ -1,5 +1,6 @@
 import { type Address, createPublicClient, fallback, type Hex, http, numberToHex, type PublicClient } from "viem";
 import { CALIBUR_ADDRESS, type Call, isDelegatedTo } from "./calibur.js";
+import { callsId, callsStatus, parseCallsId } from "./eip5792.js";
 import { ProviderRpcError } from "./errors.js";
 import { estimateCallsGas } from "./gas.js";
 import { openPopup } from "./popup.js";
@@ -162,6 +163,38 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
       case "eth_sendTransaction": {
         const tx = (params[0] ?? {}) as CallInput & { from?: string };
         return (await sendCalls(tx.from, [tx])).hash;
+      }
+      case "wallet_sendCalls": {
+        const p = (params[0] ?? {}) as {
+          chainId?: Hex;
+          from?: string;
+          calls?: CallInput[];
+          capabilities?: Record<string, { optional?: boolean } | undefined>;
+        };
+        if (p.chainId !== undefined && Number(p.chainId) !== chainId) {
+          throw new ProviderRpcError(4902, `Switch to chain ${Number(p.chainId)} before sending calls to it.`);
+        }
+        for (const [name, cap] of Object.entries(p.capabilities ?? {})) {
+          if (!cap?.optional) throw new ProviderRpcError(5700, `The capability "${name}" is not supported.`);
+        }
+        // Every batch is atomic (Calibur BATCHED_CALL), so atomicRequired is always met.
+        const sent = await sendCalls(p.from ?? address ?? undefined, p.calls ?? []);
+        return { id: callsId(sent.chainId, sent.hash) };
+      }
+      case "wallet_getCallsStatus": {
+        const parsed = parseCallsId(params[0]);
+        if (!parsed || !config.chains.some((c) => c.id === parsed.chainId)) {
+          throw new ProviderRpcError(5730, "Unknown bundle id.");
+        }
+        return callsStatus(readerFor(parsed.chainId), params[0] as string, parsed.chainId, parsed.hash);
+      }
+      case "wallet_getCapabilities": {
+        const requested = (params[1] as Hex[] | undefined)?.map((h) => Number(h)) ?? config.chains.map((c) => c.id);
+        const out: Record<string, unknown> = {};
+        for (const id of requested) {
+          if (config.chains.some((c) => c.id === id)) out[numberToHex(id)] = { atomic: { status: "supported" } };
+        }
+        return out;
       }
       default:
         if (UNSUPPORTED.has(method)) throw new ProviderRpcError(4200, `${method} is not supported yet`);
