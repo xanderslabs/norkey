@@ -4,6 +4,8 @@ import {
   fallback,
   type Hex,
   http,
+  isAddress,
+  isHex,
   numberToHex,
   type PublicClient,
   zeroAddress,
@@ -20,7 +22,8 @@ export type NorKeyChain = {
   rpcUrls: string[];
   gas: "native";
   /** The delegate this provider checks for. Default: Uniswap's Calibur. The boundary page signs only
-   *  for the address in its own build config, so this setting cannot redirect a delegation. */
+   *  for the address in its own build config, so this setting cannot redirect a delegation. Set it to
+   *  the page's `--calibur` for this chain: if they differ, every send delegates again. */
   calibur?: Address;
 };
 
@@ -43,6 +46,10 @@ const ADDRESS_KEY = "norkey:address";
 const UNSUPPORTED = new Set(["personal_sign", "eth_sign", "eth_signTypedData_v4", "wallet_showCallsStatus"]);
 
 function validate(config: NorKeyProviderConfig): void {
+  // Passkeys and crypto.randomUUID need a secure context. Fail here with the cause, not later.
+  if (globalThis.isSecureContext === false) {
+    throw new Error("NorKey: serve the app over HTTPS or from localhost (this page is not a secure context)");
+  }
   if (new URL(config.vaultOrigin).origin !== config.vaultOrigin) {
     throw new Error(`NorKey: vaultOrigin "${config.vaultOrigin}" must be a bare origin`);
   }
@@ -105,16 +112,26 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
     if (!address || from?.toLowerCase() !== address.toLowerCase()) {
       throw new ProviderRpcError(4100, "The requested account is not connected.");
     }
-    if (input.length === 0 || input.length > MAX_CALLS) {
+    if (!Array.isArray(input) || input.length === 0 || input.length > MAX_CALLS) {
       throw new ProviderRpcError(-32602, `Send between 1 and ${MAX_CALLS} calls.`);
     }
-    if (input.some((c) => !c.to)) throw new ProviderRpcError(-32602, "Contract creation is not supported.");
-    // The boundary page refuses these too: as the account itself, a call could reach Calibur's admin functions.
-    if (input.some((c) => [address?.toLowerCase(), zeroAddress].includes(c.to?.toLowerCase()))) {
-      throw new ProviderRpcError(-32602, "A call to the wallet itself is not supported.");
-    }
-    if (input.some((c) => c.data && c.data.length % 2 !== 0)) {
-      throw new ProviderRpcError(-32602, "Call data must be whole bytes.");
+    for (const c of input as unknown[]) {
+      if (typeof c !== "object" || c === null) throw new ProviderRpcError(-32602, "A call is not an object.");
+      const { to, value, data } = c as Record<string, unknown>;
+      if (!to) throw new ProviderRpcError(-32602, "Contract creation is not supported.");
+      if (typeof to !== "string" || !isAddress(to, { strict: false })) {
+        throw new ProviderRpcError(-32602, "A call's recipient is not an address.");
+      }
+      // The boundary page refuses these too: as the account itself, a call could reach Calibur's admin functions.
+      if (to.toLowerCase() === address.toLowerCase() || to.toLowerCase() === zeroAddress) {
+        throw new ProviderRpcError(-32602, "A call to the wallet itself is not supported.");
+      }
+      if (value !== undefined && (typeof value !== "string" || !/^0x[0-9a-fA-F]+$/.test(value))) {
+        throw new ProviderRpcError(-32602, "A call's value is not a hex quantity.");
+      }
+      if (data !== undefined && (typeof data !== "string" || !isHex(data) || data.length % 2 !== 0)) {
+        throw new ProviderRpcError(-32602, "A call's data is not whole bytes of hex.");
+      }
     }
     const sender = address;
     const id = chainId;

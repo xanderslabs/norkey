@@ -9,7 +9,12 @@ export function parseCallsId(id: unknown): { chainId: number; hash: Hex } | null
   return m ? { chainId: Number(m[1]), hash: m[2] as Hex } : null;
 }
 
-/** EIP-5792 2.0.0 status: 100 pending, 200 confirmed, 500 reverted on chain. Batches are atomic. */
+/**
+ * EIP-5792 2.0.0 status: 100 pending, 200 confirmed, 500 reverted on chain. Batches are atomic.
+ * 100 means "no receipt yet": a dropped transaction, or a well-formed id that was never sent, stays at
+ * 100. A transaction just sent can be missing from a load-balanced RPC for a moment, so this does not
+ * answer 5730 for it. Stop polling after a timeout, as viem's `waitForCallsStatus` does.
+ */
 export async function callsStatus(client: PublicClient, id: string, chainId: number, hash: Hex) {
   const receipt = await client.getTransactionReceipt({ hash }).catch((e: unknown) => {
     if (e instanceof TransactionReceiptNotFoundError) return null;
