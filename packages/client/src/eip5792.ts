@@ -53,7 +53,7 @@ export async function userOpCallsStatus(proxyUrl: string, id: string, chainId: n
     status: r.success ? 200 : 500,
     receipts: [
       {
-        logs: r.receipt.logs.map((l) => ({ address: l.address, data: l.data, topics: l.topics })),
+        logs: (r.receipt.logs ?? []).map((l) => ({ address: l.address, data: l.data, topics: l.topics })),
         status: r.receipt.status,
         blockHash: r.receipt.blockHash,
         blockNumber: r.receipt.blockNumber,

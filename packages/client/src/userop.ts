@@ -195,10 +195,13 @@ export async function getUserOpReceipt(proxyUrl: string, hash: Hex): Promise<Rpc
 }
 
 /** eth_sendTransaction must return a transaction hash: wait up to 60 s for the bundle that holds the
- *  operation. A bundle can succeed while the operation inside reverts, so that throws. */
-export async function waitForUserOpTransaction(proxyUrl: string, hash: Hex): Promise<Hex> {
+ *  operation. A bundle can succeed while the operation inside reverts, so that throws. The operation
+ *  is already sent, so a failed status check (a 401 included) does not end the wait: only the deadline
+ *  does. A 401 here must not reach request() as SessionExpiredError, or the payment that may land
+ *  would forget the account. */
+export async function waitForUserOpTransaction(proxyUrl: string, hash: Hex, chainId: number): Promise<Hex> {
   for (let i = 0; i < 30; i++) {
-    const r = await getUserOpReceipt(proxyUrl, hash);
+    const r = await getUserOpReceipt(proxyUrl, hash).catch(() => null);
     if (r) {
       if (!r.success) {
         throw new ProviderRpcError(
@@ -210,8 +213,9 @@ export async function waitForUserOpTransaction(proxyUrl: string, hash: Hex): Pro
     }
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
+  // Formatted as callsId in eip5792.ts formats it. Importing it here would be an import cycle.
   throw new ProviderRpcError(
     -32603,
-    `The user operation ${hash} was not bundled within 60 seconds. Look it up with eth_getUserOperationReceipt.`,
+    `The user operation ${hash} was not bundled within 60 seconds. Check it later with wallet_getCallsStatus and the id ${numberToHex(chainId)}:op:${hash}.`,
   );
 }

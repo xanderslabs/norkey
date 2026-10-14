@@ -253,7 +253,7 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
         const sent = await sendCalls(tx.from, [tx]);
         if (!sent.op) return sent.hash;
         const chain = chainOf(sent.chainId) as NorKeyChain & { gas: "sponsored" };
-        return waitForUserOpTransaction(proxyFor(chain), sent.hash);
+        return waitForUserOpTransaction(proxyFor(chain), sent.hash, sent.chainId);
       }
       case "wallet_sendCalls": {
         const p = (params[0] ?? {}) as {
