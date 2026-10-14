@@ -72,11 +72,11 @@ $("send").addEventListener("click", async () => {
     const to = ($("to") as HTMLInputElement).value.trim() as Address;
     const value = parseEther(($("amount") as HTMLInputElement).value.trim());
     const hash = await wallet.sendTransaction({ account, chain, to, value });
-    log(`sent ${hash} https://sepolia.etherscan.io/tx/${hash}`);
+    log(`sent ${hash} ${chain.blockExplorers?.default.url}/tx/${hash}`);
     const receipt = await reader().waitForTransactionReceipt({ hash });
     log(`confirmed in block ${receipt.blockNumber} (${receipt.status})`);
     const sent = await reader().getTransaction({ hash });
-    log(`type ${sent.type}${sent.type === "eip7702" ? " (first send on this chain: delegated to Calibur)" : ""}`);
+    log(`type ${sent.type}${sent.type === "eip7702" ? " (delegated to Calibur in this transaction)" : ""}`);
     await refresh();
   } catch (e) {
     report(e);
@@ -99,7 +99,7 @@ $("batch").addEventListener("click", async () => {
     log(`batch ${status.status} in block ${status.receipts?.[0]?.blockNumber}`);
     if (hash) {
       const sent = await reader().getTransaction({ hash });
-      log(`type ${sent.type}${sent.type === "eip7702" ? " (first send on this chain: delegated to Calibur)" : ""}`);
+      log(`type ${sent.type}${sent.type === "eip7702" ? " (delegated to Calibur in this transaction)" : ""}`);
     }
     await refresh();
   } catch (e) {
