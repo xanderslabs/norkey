@@ -128,8 +128,39 @@ try {
   const landed = await latestTx(rpc);
   assert.equal((await rpc("eth_getTransactionReceipt", [landed.hash])).result.status, "0x1");
   assert.equal(await bal(address), 0n);
-  await rpc("anvil_setBalance", [address, "0x3328b944c4000"]); // back to 0.0009 ETH for step 3
+  await rpc("anvil_setBalance", [address, "0x3328b944c4000"]); // back to 0.0009 ETH: step 3 sends 0.0002 of it
   console.log("2b. reverted inside a landed bundle: eth_sendTransaction threw -32603");
+
+  // 3. A sponsored batch of two on the now-delegated wallet: no authorization, both paid, status 200.
+  const to2 = "0x000000000000000000000000000000000000cafE";
+  const [b1, b2] = [await bal(to), await bal(to2)];
+  await dropOldPopups();
+  await page.fill("#to2", to2);
+  await page.click("#batch");
+  await wallet().getByText("Approve 2 calls").waitFor();
+  assert.equal(await wallet().getByText("upgrades your wallet").count(), 0);
+  await wallet().getByText("Approve with passkey").click();
+  await page.waitForFunction(() => document.getElementById("log")?.textContent?.includes("batch success"), null, {
+    timeout: 90000,
+  });
+  assert.match(await logText(), /batch 0xaa36a7:op:0x[0-9a-f]{64}/);
+  assert.equal((await latestTx(rpc)).type, "0x2");
+  assert.equal((await bal(to)) - b1, 100000000000000n);
+  assert.equal((await bal(to2)) - b2, 100000000000000n);
+  assert.equal(await bal(address), 700000000000000n);
+  console.log("3. sponsored batch: no authorization, both recipients paid, status 200, wallet paid only the values");
+
+  // 3b. A batch that reverts inside a landed bundle must report 500 (viem: "failure"), not 200.
+  await dropOldPopups();
+  await page.click("#batch");
+  await wallet().getByText("Approve 2 calls").waitFor();
+  await rpc("anvil_setBalance", [address, "0x0"]);
+  await wallet().getByText("Approve with passkey").click();
+  await page.waitForFunction(() => document.getElementById("log")?.textContent?.includes("batch failure"), null, {
+    timeout: 90000,
+  });
+  await rpc("anvil_setBalance", [address, "0x27ca57357c000"]); // back to 0.0007 ETH for step 4
+  console.log("3b. reverted batch inside a landed bundle: status 500");
 
   // 4. Reject on the consent screen: 4001, and the EntryPoint nonce does not move.
   const nonceBefore = await epNonce(address);

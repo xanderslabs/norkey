@@ -11,12 +11,11 @@ import {
   zeroAddress,
 } from "viem";
 import { CALIBUR_ADDRESS, type Call, isDelegatedTo } from "./calibur.js";
-import { callsId, callsStatus, parseCallsId } from "./eip5792.js";
+import { callsId, callsStatus, parseCallsId, userOpCallsStatus } from "./eip5792.js";
 import { ProviderRpcError } from "./errors.js";
 import { estimateCallsGas } from "./gas.js";
 import { openPopup } from "./popup.js";
-import type { PreparedUserOp } from "./protocol.js";
-import { MAX_CALLS, type PopupReply, type PopupRequest, PROTOCOL_VERSION } from "./protocol.js";
+import { MAX_CALLS, type PopupReply, type PopupRequest, PROTOCOL_VERSION, type PreparedUserOp } from "./protocol.js";
 import { prepareUserOp, SessionExpiredError, submitUserOp, waitForUserOpTransaction } from "./userop.js";
 
 type ChainBase = {
@@ -269,17 +268,19 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
         for (const [name, cap] of Object.entries(p.capabilities ?? {})) {
           if (!cap?.optional) throw new ProviderRpcError(5700, `The capability "${name}" is not supported.`);
         }
-        if (chainOf(chainId).gas === "sponsored") {
-          throw new ProviderRpcError(4200, "wallet_sendCalls on a sponsored chain is not supported yet.");
-        }
         // Every batch is atomic (Calibur BATCHED_CALL), so atomicRequired is always met.
         const sent = await sendCalls(p.from ?? address ?? undefined, p.calls ?? []);
-        return { id: callsId(sent.chainId, sent.hash) };
+        return { id: callsId(sent.chainId, sent.hash, sent.op) };
       }
       case "wallet_getCallsStatus": {
         const parsed = parseCallsId(params[0]);
         if (!parsed || !config.chains.some((c) => c.id === parsed.chainId)) {
           throw new ProviderRpcError(5730, "Unknown bundle id.");
+        }
+        const chain = chainOf(parsed.chainId);
+        if (parsed.op) {
+          if (chain.gas !== "sponsored") throw new ProviderRpcError(5730, "Unknown bundle id.");
+          return userOpCallsStatus(proxyFor(chain), params[0] as string, parsed.chainId, parsed.hash);
         }
         return callsStatus(readerFor(parsed.chainId), params[0] as string, parsed.chainId, parsed.hash);
       }
