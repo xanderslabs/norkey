@@ -54,6 +54,9 @@ export function resolveConfig(c: NorKeyHandlerConfig): ResolvedConfig {
   checkOrigins(c.origins, "origins");
   const appOrigins = c.appOrigins ?? [];
   checkOrigins(appOrigins, "appOrigins");
+  // An app origin in origins would also be WebAuthn's expected origin, and a passkey login releases the wrap.
+  if (appOrigins.some((o) => c.origins.includes(o)))
+    throw new Error("NorKey: an origin cannot be in both origins and appOrigins");
   const proxied = Object.entries(c.paymasterProxy ?? {});
   for (const [chainId, p] of proxied) {
     // Never echo p.url: it holds the API key.

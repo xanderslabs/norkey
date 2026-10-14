@@ -63,6 +63,16 @@ export async function proxyPaymaster(
   return relay(entry.url, a.chainId, id, method, forward);
 }
 
+/** An upstream message can quote the URL, key included, or carry viem-style "URL:" and "Request body:"
+ *  lines. Keep the first line, replace every URL and the configured URL's key, and cap the length. */
+function trimMessage(message: string, url: string): string {
+  let m = (message.split(/\r?\n/, 1)[0] ?? "").replace(/https?:\/\/\S+/g, "[url]");
+  for (const secret of [url, ...new URL(url).searchParams.values()]) {
+    if (secret) m = m.split(secret).join("[url]");
+  }
+  return m.slice(0, 300);
+}
+
 /** Never logs or returns `url`: it holds the API key. Upstream error data and headers are dropped. */
 async function relay(url: string, chainId: number, id: unknown, method: string, params: unknown[]): Promise<Result> {
   const unavailable = () => rpcError(id, -32603, "paymaster service unavailable");
@@ -85,7 +95,11 @@ async function relay(url: string, chainId: number, id: unknown, method: string, 
   } catch {}
   if (data && typeof data === "object" && data.error) {
     const code = typeof data.error.code === "number" ? data.error.code : -32603;
-    return rpcError(id, code, typeof data.error.message === "string" ? data.error.message : "paymaster error");
+    return rpcError(
+      id,
+      code,
+      typeof data.error.message === "string" ? trimMessage(data.error.message, url) : "paymaster error",
+    );
   }
   if (!res.ok || !data || typeof data !== "object" || !("result" in data)) {
     console.error(`norkey: paymaster ${chainId}: upstream status ${res.status}`);

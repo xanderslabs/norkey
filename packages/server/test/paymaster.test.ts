@@ -158,6 +158,28 @@ describe("paymaster proxy", () => {
     });
   });
 
+  it("trims the upstream error message so the key and URL never reach the client", async () => {
+    // Why: a vendor or a viem-style error can put the full URL, key included, in its message text,
+    // with "URL:" and "Request body:" lines after it. Relaying that text as is leaks the key.
+    const { rpc } = await setup(undefined, (req) => ({
+      jsonrpc: "2.0",
+      id: req.id,
+      error: {
+        code: -32003,
+        message: `sponsorship rejected at ${SECRET_URL}\nURL: ${SECRET_URL}\nRequest body: {"method":"pm_getPaymasterStubData"}`,
+      },
+    }));
+    const res = await rpc(stubCall());
+    const text = await res.text();
+    expect(text).not.toContain("SECRET");
+    expect(text).not.toContain("paymaster.example");
+    expect(text).not.toContain("Request body");
+    const body = JSON.parse(text);
+    expect(body.error.code).toBe(-32003);
+    expect(body.error.message).toMatch(/^sponsorship rejected/);
+    expect(body.error.message.length).toBeLessThanOrEqual(300);
+  });
+
   it("keeps app origins away from the passkey routes", async () => {
     const { post } = await setup();
     for (const path of ["/login/options", "/login/verify", "/register/options", "/register/verify", "/wallet"]) {
@@ -181,5 +203,19 @@ describe("paymaster proxy", () => {
     } catch (e) {
       expect(String(e)).not.toContain("SECRET");
     }
+  });
+
+  it("refuses an origin listed in both origins and appOrigins", () => {
+    // Why: origins is also WebAuthn's expected origin. An app origin there lets script on the app
+    // page (an XSS) run a passkey login and take the wrap, which app-only origins exist to prevent.
+    const make = () =>
+      createNorKeyHandler({
+        rpId: "localhost",
+        origins: [vault, app],
+        appOrigins: [app],
+        storage: sqlite(":memory:"),
+        paymasterProxy: { 11155111: { url: SECRET_URL, allow: () => true } },
+      });
+    expect(make).toThrow(/cannot be in both origins and appOrigins/);
   });
 });
