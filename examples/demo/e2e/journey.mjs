@@ -42,19 +42,22 @@ async function waitFor(url, init) {
   }
   throw new Error(`timed out waiting for ${url}`);
 }
-const rpc = (method, params) =>
-  fetch("http://127.0.0.1:8545", {
+const rpcAt = (port) => (method, params) =>
+  fetch(`http://127.0.0.1:${port}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
   }).then((r) => r.json());
-const latestTx = async () => (await rpc("eth_getBlockByNumber", ["latest", true])).result.transactions[0];
+const rpc = rpcAt(8545);
+const rpcU = rpcAt(8546);
+const latestTx = async (call = rpc) => (await call("eth_getBlockByNumber", ["latest", true])).result.transactions[0];
 const CALIBUR = "0x000000005c84F8Fd50b21CAC312528A64437030e";
 const DESIGNATOR = `0xef0100${CALIBUR.slice(2)}`.toLowerCase();
 
 let browser;
 try {
   start("anvil", ["--fork-url", forkUrl, "--port", "8545", "--silent"]);
+  start("anvil", ["--fork-url", process.env.UNICHAIN_SEPOLIA_RPC ?? "https://sepolia.unichain.org", "--port", "8546", "--silent"]);
   start("node", ["packages/server/dist/serve.js"], {
     NORKEY_RP_ID: "localhost",
     NORKEY_ORIGINS: "http://localhost:5174",
@@ -71,15 +74,19 @@ try {
     "--app-origin",
     "http://localhost:5173",
     "--chains",
-    "11155111",
+    "11155111,1301",
     "--out",
     vaultDir,
   ]);
   await new Promise((r, j) => build.on("exit", (c) => (c === 0 ? r() : j(new Error(build.output)))));
   start("node", ["packages/vault/dist/bin.js", "serve", "--dir", vaultDir, "--port", "5174"]);
-  start("pnpm", ["--filter", "demo", "dev"], { VITE_SEPOLIA_RPC: "http://127.0.0.1:8545" });
+  start("pnpm", ["--filter", "demo", "dev"], {
+    VITE_SEPOLIA_RPC: "http://127.0.0.1:8545",
+    VITE_UNICHAIN_SEPOLIA_RPC: "http://127.0.0.1:8546",
+  });
   await Promise.all([
     waitFor("http://127.0.0.1:8545", { method: "POST", body: "{}" }),
+    waitFor("http://127.0.0.1:8546", { method: "POST", body: "{}" }),
     waitFor("http://localhost:8787/norkey/wallet"),
     waitFor("http://localhost:5174/"),
     waitFor("http://localhost:5173/"),
@@ -217,6 +224,35 @@ try {
   });
   assert.equal(await page.locator("#address").textContent(), address);
   console.log("6. reconnected to the same address");
+
+  // 7. Unichain Sepolia: switch, fund, and the first batch there delegates in the same transaction.
+  await rpcU("anvil_setBalance", [address, "0xde0b6b3a7640000"]);
+  await page.selectOption("#chain", "1301");
+  await page.waitForFunction(() => document.getElementById("log")?.textContent?.includes("switched to Unichain Sepolia"));
+  await page.fill("#to", to);
+  await page.fill("#to2", to2);
+  await page.click("#batch");
+  await wallet().getByText("upgrades your wallet").waitFor();
+  await wallet().getByText("Approve with passkey").click();
+  // Step 6 reloaded the page, so this is the log's first "batch success".
+  await page.waitForFunction(() => document.getElementById("log")?.textContent?.includes("batch success"), null, {
+    timeout: 60000,
+  });
+  assert.equal((await rpcU("eth_getCode", [address, "latest"])).result.toLowerCase(), DESIGNATOR);
+  assert.equal((await latestTx(rpcU)).type, "0x4");
+  console.log("7. Unichain Sepolia: first batch delegated (type 4), status success");
+
+  // 8. A blocked popup: window.open returns null, and the app gets 4001 and stays usable.
+  // The iframes standing in for earlier popups stay in the page (a real popup closes) and shift the
+  // layout under the click, so remove them first.
+  await page.evaluate(() => {
+    for (const f of document.querySelectorAll("iframe")) f.remove();
+    window.open = () => null;
+  });
+  await page.click("#send");
+  await page.waitForFunction(() => document.getElementById("log")?.textContent?.includes("popup was blocked"));
+  assert.match(await logText(), /error 4001/);
+  console.log("8. blocked popup: 4001");
   console.log("JOURNEY PASS");
 } catch (e) {
   console.error("JOURNEY FAIL:", e);

@@ -1,17 +1,40 @@
 import { createNorKeyProvider } from "@norkey/client";
-import { type Address, createPublicClient, createWalletClient, custom, formatEther, http, parseEther } from "viem";
-import { sepolia } from "viem/chains";
+import {
+  type Address,
+  type Chain,
+  createPublicClient,
+  createWalletClient,
+  custom,
+  formatEther,
+  http,
+  type PublicClient,
+  parseEther,
+} from "viem";
+import { sepolia, unichainSepolia } from "viem/chains";
 
-const rpc: string = import.meta.env.VITE_SEPOLIA_RPC ?? "https://ethereum-sepolia-rpc.publicnode.com";
+const rpcs: Record<number, string> = {
+  [sepolia.id]: import.meta.env.VITE_SEPOLIA_RPC ?? "https://ethereum-sepolia-rpc.publicnode.com",
+  [unichainSepolia.id]: import.meta.env.VITE_UNICHAIN_SEPOLIA_RPC ?? "https://sepolia.unichain.org",
+};
+const chains: Record<number, Chain> = { [sepolia.id]: sepolia, [unichainSepolia.id]: unichainSepolia };
 const vaultOrigin: string = import.meta.env.VITE_VAULT_ORIGIN ?? "http://localhost:5174";
 
 const norkey = createNorKeyProvider({
   vaultOrigin,
-  chains: [{ id: sepolia.id, rpcUrls: [rpc], gas: "native" }],
+  chains: Object.entries(rpcs).map(([id, url]) => ({ id: Number(id), rpcUrls: [url], gas: "native" as const })),
   defaultChainId: sepolia.id,
 });
-const wallet = createWalletClient({ chain: sepolia, transport: custom(norkey) });
-const reader = createPublicClient({ chain: sepolia, transport: http(rpc) });
+const wallet = createWalletClient({ transport: custom(norkey) });
+const readers = new Map<number, PublicClient>();
+let chain: Chain = sepolia;
+const reader = (): PublicClient => {
+  let r = readers.get(chain.id);
+  if (!r) {
+    r = createPublicClient({ chain, transport: http(rpcs[chain.id]) }) as PublicClient;
+    readers.set(chain.id, r);
+  }
+  return r;
+};
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const log = (line: string) => {
@@ -21,7 +44,7 @@ let account: Address | undefined;
 
 async function refresh(): Promise<void> {
   if (!account) return;
-  $("balance").textContent = `${formatEther(await reader.getBalance({ address: account }))} ETH`;
+  $("balance").textContent = `${formatEther(await reader().getBalance({ address: account }))} ETH`;
 }
 
 function report(e: unknown): void {
@@ -48,11 +71,11 @@ $("send").addEventListener("click", async () => {
   try {
     const to = ($("to") as HTMLInputElement).value.trim() as Address;
     const value = parseEther(($("amount") as HTMLInputElement).value.trim());
-    const hash = await wallet.sendTransaction({ account, to, value });
+    const hash = await wallet.sendTransaction({ account, chain, to, value });
     log(`sent ${hash} https://sepolia.etherscan.io/tx/${hash}`);
-    const receipt = await reader.waitForTransactionReceipt({ hash });
+    const receipt = await reader().waitForTransactionReceipt({ hash });
     log(`confirmed in block ${receipt.blockNumber} (${receipt.status})`);
-    const sent = await reader.getTransaction({ hash });
+    const sent = await reader().getTransaction({ hash });
     log(`type ${sent.type}${sent.type === "eip7702" ? " (first send on this chain: delegated to Calibur)" : ""}`);
     await refresh();
   } catch (e) {
@@ -67,7 +90,7 @@ $("batch").addEventListener("click", async () => {
     const recipients = [($("to") as HTMLInputElement).value.trim(), ($("to2") as HTMLInputElement).value.trim()];
     const { id } = await wallet.sendCalls({
       account,
-      chain: sepolia,
+      chain,
       calls: recipients.map((to) => ({ to: to as Address, value })),
     });
     log(`batch ${id}`);
@@ -75,12 +98,24 @@ $("batch").addEventListener("click", async () => {
     const hash = status.receipts?.[0]?.transactionHash;
     log(`batch ${status.status} in block ${status.receipts?.[0]?.blockNumber}`);
     if (hash) {
-      const sent = await reader.getTransaction({ hash });
+      const sent = await reader().getTransaction({ hash });
       log(`type ${sent.type}${sent.type === "eip7702" ? " (first send on this chain: delegated to Calibur)" : ""}`);
     }
     await refresh();
   } catch (e) {
     report(e);
+  }
+});
+
+$("chain").addEventListener("change", async (e) => {
+  try {
+    const id = Number((e.target as HTMLSelectElement).value);
+    await wallet.switchChain({ id });
+    chain = chains[id] as Chain;
+    log(`switched to ${chain.name}`);
+    await refresh();
+  } catch (err) {
+    report(err);
   }
 });
 

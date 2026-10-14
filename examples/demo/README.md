@@ -21,7 +21,7 @@ Then start three processes from the repo root.
 2. The boundary page:
 
    ```sh
-   node packages/vault/dist/bin.js build --rp-id localhost --api http://localhost:8787/norkey --app-origin http://localhost:5173 --chains 11155111
+   node packages/vault/dist/bin.js build --rp-id localhost --api http://localhost:8787/norkey --app-origin http://localhost:5173 --chains 11155111,1301
    node packages/vault/dist/bin.js serve --port 5174
    ```
 
@@ -33,6 +33,10 @@ Then start three processes from the repo root.
 
 Open http://localhost:5173, click **Connect**, then **Create a new wallet**. Fund the address from a Sepolia
 faucet, then send a small amount. Set `VITE_SEPOLIA_RPC` to use your own RPC.
+Set `VITE_UNICHAIN_SEPOLIA_RPC` to use your own Unichain Sepolia RPC.
+
+The Unichain Sepolia address needs its own test ETH, for example bridged from Sepolia or from a
+faucet.
 
 ## End-to-end journey
 
