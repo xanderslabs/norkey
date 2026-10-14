@@ -15,7 +15,11 @@ const WALLET = "0x00000000000000000000000000000000000a11ce";
 
 type Allow = (a: { userId: string; address: string; chainId: number; method: string; userOp: unknown }) => boolean;
 
-async function setup(allow: Allow = () => true, upstreamReply?: (req: { id: unknown; params: unknown[] }) => unknown) {
+async function setup(
+  allow: Allow = () => true,
+  upstreamReply?: (req: { id: unknown; params: unknown[] }) => unknown,
+  url = SECRET_URL,
+) {
   const storage = sqlite(":memory:");
   const allowSpy = vi.fn(allow);
   const upstream = vi.fn(async (_url: string, init: RequestInit) => {
@@ -28,7 +32,7 @@ async function setup(allow: Allow = () => true, upstreamReply?: (req: { id: unkn
     origins: [vault],
     appOrigins: [app],
     storage,
-    paymasterProxy: { 11155111: { url: SECRET_URL, context: { sponsorshipPolicyId: "sp_server" }, allow: allowSpy } },
+    paymasterProxy: { 11155111: { url, context: { sponsorshipPolicyId: "sp_server" }, allow: allowSpy } },
   });
   await storage.createUser("alice");
   await storage.addCredential({
@@ -178,6 +182,26 @@ describe("paymaster proxy", () => {
     expect(body.error.code).toBe(-32003);
     expect(body.error.message).toMatch(/^sponsorship rejected/);
     expect(body.error.message.length).toBeLessThanOrEqual(300);
+
+    // Some vendors put the key in the path, and a message can quote the host and path with no scheme,
+    // or a URL with another scheme.
+    const PATH_KEY = "PATHKEY0123456789abcdef";
+    const pathUrl = `https://eth-sepolia.g.alchemy.com/v2/${PATH_KEY}`;
+    const second = await setup(
+      undefined,
+      (req) => ({
+        jsonrpc: "2.0",
+        id: req.id,
+        error: {
+          code: -32003,
+          message: `rejected by eth-sepolia.g.alchemy.com/v2/${PATH_KEY} (wss://eth-sepolia.g.alchemy.com/v2/${PATH_KEY})`,
+        },
+      }),
+      pathUrl,
+    );
+    const pathText = await (await second.rpc(stubCall())).text();
+    expect(pathText).not.toContain(PATH_KEY);
+    expect(JSON.parse(pathText).error.message).toMatch(/^rejected by/);
   });
 
   it("keeps app origins away from the passkey routes", async () => {
