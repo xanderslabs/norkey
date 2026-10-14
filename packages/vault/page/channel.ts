@@ -9,7 +9,7 @@ export function acceptRequest(event: MessageEvent, appOrigins: string[]): PopupR
   if (!appOrigins.includes(event.origin)) return null;
   const d = event.data as Partial<PopupRequest> | null;
   if (!d || d.v !== PROTOCOL_VERSION || typeof d.id !== "string") return null;
-  if (d.kind !== "connect" && d.kind !== "sign-calls") return null;
+  if (d.kind !== "connect" && d.kind !== "sign-calls" && d.kind !== "sign-userop") return null;
   requesterOrigin = event.origin;
   return d as PopupRequest;
 }

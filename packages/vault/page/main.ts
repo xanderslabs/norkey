@@ -1,9 +1,15 @@
-import { type PopupReply, type PopupRequest, PROTOCOL_VERSION, type PreparedCalls } from "@norkey/client/protocol";
+import {
+  type PopupReply,
+  type PopupRequest,
+  PROTOCOL_VERSION,
+  type PreparedCalls,
+  type PreparedUserOp,
+} from "@norkey/client/protocol";
 import { ApiError, createApi } from "./api.js";
-import { RequestError, validateCalls } from "./calls.js";
+import { RequestError, validateCalls, validateUserOp } from "./calls.js";
 import { acceptRequest, announceReady, reply } from "./channel.js";
 import { type PageConfig, readConfig } from "./config.js";
-import { connectCreate, connectExisting, FlowError, signCalls } from "./flows.js";
+import { connectCreate, connectExisting, FlowError, signCalls, signUserOperation } from "./flows.js";
 import { CancelledError, NoPrfError, PasskeyError } from "./passkey.js";
 import { showBusy, showConnect, showConsent, showError, showWaiting } from "./view.js";
 import { WrapError } from "./wrap.js";
@@ -41,6 +47,10 @@ function fail(id: string, e: unknown): void {
 const reject = (id: string) => () =>
   finish({ v: PROTOCOL_VERSION, id, ok: false, code: 4001, message: "User rejected the request." });
 
+// The validators guarantee the chain is in the map.
+const caliburFor = (chainId: number) =>
+  (config.chains.find((c) => c.id === chainId) as PageConfig["chains"][number]).calibur;
+
 function handle(req: PopupRequest, origin: string): void {
   if (req.kind === "connect") {
     const run = (flow: () => Promise<{ address: `0x${string}` }>) => async () => {
@@ -59,21 +69,57 @@ function handle(req: PopupRequest, origin: string): void {
     });
     return;
   }
-  let calls: PreparedCalls;
+  if (req.kind === "sign-calls") {
+    let calls: PreparedCalls;
+    try {
+      calls = validateCalls(req.calls, config.chains);
+    } catch (e) {
+      fail(req.id, e);
+      return;
+    }
+    const calibur = caliburFor(calls.chainId);
+    const consent = {
+      chainId: calls.chainId,
+      from: calls.from,
+      calls: calls.calls,
+      delegate: calls.delegate,
+      fee: { kind: "native" as const, gas: calls.gas, maxFeePerGas: calls.maxFeePerGas },
+    };
+    showConsent(origin, consent, calibur, {
+      approve: async () => {
+        showBusy("Waiting for your passkey...");
+        try {
+          const { raw } = await signCalls(api, calls, calibur);
+          finish({ v: PROTOCOL_VERSION, id: req.id, ok: true, kind: "sign-calls", raw });
+        } catch (e) {
+          fail(req.id, e);
+        }
+      },
+      reject: reject(req.id),
+    });
+    return;
+  }
+  let op: PreparedUserOp;
   try {
-    calls = validateCalls(req.calls, config.chains);
+    op = validateUserOp(req.op, config.chains);
   } catch (e) {
     fail(req.id, e);
     return;
   }
-  // validateCalls guarantees the chain is in the map.
-  const calibur = (config.chains.find((c) => c.id === calls.chainId) as PageConfig["chains"][number]).calibur;
-  showConsent(origin, calls, calibur, {
+  const calibur = caliburFor(op.chainId);
+  const consent = {
+    chainId: op.chainId,
+    from: op.sender,
+    calls: op.calls,
+    delegate: op.authorizationNonce !== null,
+    fee: { kind: "sponsored" as const, paymaster: op.paymaster, nonce: op.nonce, paymasterData: op.paymasterData },
+  };
+  showConsent(origin, consent, calibur, {
     approve: async () => {
       showBusy("Waiting for your passkey...");
       try {
-        const { raw } = await signCalls(api, calls, calibur);
-        finish({ v: PROTOCOL_VERSION, id: req.id, ok: true, kind: "sign-calls", raw });
+        const { signature, authorization } = await signUserOperation(api, op, calibur);
+        finish({ v: PROTOCOL_VERSION, id: req.id, ok: true, kind: "sign-userop", signature, authorization });
       } catch (e) {
         fail(req.id, e);
       }

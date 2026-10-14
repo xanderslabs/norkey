@@ -15,17 +15,27 @@ import { callsId, callsStatus, parseCallsId } from "./eip5792.js";
 import { ProviderRpcError } from "./errors.js";
 import { estimateCallsGas } from "./gas.js";
 import { openPopup } from "./popup.js";
+import type { PreparedUserOp } from "./protocol.js";
 import { MAX_CALLS, type PopupReply, type PopupRequest, PROTOCOL_VERSION } from "./protocol.js";
+import { prepareUserOp, SessionExpiredError, submitUserOp, waitForUserOpTransaction } from "./userop.js";
 
-export type NorKeyChain = {
+type ChainBase = {
   id: number;
   rpcUrls: string[];
-  gas: "native";
   /** The delegate this provider checks for. Default: Uniswap's Calibur. The boundary page signs only
    *  for the address in its own build config, so this setting cannot redirect a delegation. Set it to
    *  the page's `--calibur` for this chain: if they differ, every send delegates again. */
   calibur?: Address;
 };
+
+export type NorKeyChain =
+  | (ChainBase & { gas: "native" })
+  | (ChainBase & {
+      gas: "sponsored";
+      /** The NorKey paymaster proxy for this chain, e.g. "/norkey/paymaster/11155111". A relative URL
+       *  resolves against the app page. It serves both the paymaster and the bundler methods. */
+      paymasterUrl: string;
+    });
 
 export type NorKeyProviderConfig = {
   /** The boundary page origin, e.g. "https://accounts.app.com". */
@@ -58,7 +68,15 @@ function validate(config: NorKeyProviderConfig): void {
   }
   for (const c of config.chains) {
     if (c.rpcUrls.length === 0) throw new Error(`NorKey: chain ${c.id} has no rpcUrls`);
-    if (c.gas !== "native") throw new Error(`NorKey: chain ${c.id}: only gas "native" is supported in this version`);
+    if (c.gas === "sponsored") {
+      if (typeof c.paymasterUrl !== "string" || c.paymasterUrl === "") {
+        throw new Error(`NorKey: chain ${c.id} has gas "sponsored" but no paymasterUrl`);
+      }
+    } else if (c.gas !== "native") {
+      // Unreachable for typed callers: this catches a gas value from untyped JavaScript.
+      const bad = c as { id: number; gas: unknown };
+      throw new Error(`NorKey: chain ${bad.id}: gas "${String(bad.gas)}" is not supported in this version`);
+    }
   }
 }
 
@@ -72,6 +90,11 @@ function load(): Address | null {
 function save(address: Address): void {
   try {
     localStorage.setItem(ADDRESS_KEY, address);
+  } catch {}
+}
+function forget(): void {
+  try {
+    localStorage.removeItem(ADDRESS_KEY);
   } catch {}
 }
 
@@ -94,6 +117,13 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
     }
     return c;
   };
+  const proxyFor = (chain: NorKeyChain & { gas: "sponsored" }): string =>
+    new URL(chain.paymasterUrl, globalThis.location?.href).href;
+  const forgetAccount = () => {
+    address = null;
+    forget();
+    emit("accountsChanged", []);
+  };
   // Opens the popup synchronously (see openPopup), so call `ask` before awaiting anything.
   const ask = async <K extends PopupRequest["kind"]>(
     kind: K,
@@ -108,7 +138,10 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
 
   /** The one send path for eth_sendTransaction and wallet_sendCalls. Nothing here awaits before
    *  `ask`, so the popup opens inside the click's user activation. */
-  async function sendCalls(from: string | undefined, input: CallInput[]): Promise<{ chainId: number; hash: Hex }> {
+  async function sendCalls(
+    from: string | undefined,
+    input: CallInput[],
+  ): Promise<{ chainId: number; hash: Hex; op: boolean }> {
     if (!address || from?.toLowerCase() !== address.toLowerCase()) {
       throw new ProviderRpcError(4100, "The requested account is not connected.");
     }
@@ -142,6 +175,18 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
       value: c.value ? BigInt(c.value) : 0n,
       data: c.data ?? "0x",
     }));
+    const chain = chainOf(id);
+    if (chain.gas === "sponsored") {
+      const proxyUrl = proxyFor(chain);
+      let prepared: PreparedUserOp | undefined;
+      const reply = await ask("sign-userop", async (rid) => {
+        prepared = await prepareUserOp({ client, proxyUrl, chainId: id, sender, calls, calibur });
+        return { v: PROTOCOL_VERSION, id: rid, kind: "sign-userop", op: prepared };
+      });
+      // ask resolves only after prepare ran, so prepared is set.
+      const hash = await submitUserOp(proxyUrl, prepared as PreparedUserOp, reply.signature, reply.authorization);
+      return { chainId: id, hash, op: true };
+    }
     const { raw } = await ask("sign-calls", async (rid) => {
       const [code, nonce, fees] = await Promise.all([
         client.getCode({ address: sender }),
@@ -166,10 +211,21 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
         },
       };
     });
-    return { chainId: id, hash: await client.sendRawTransaction({ serializedTransaction: raw }) };
+    return { chainId: id, hash: await client.sendRawTransaction({ serializedTransaction: raw }), op: false };
   }
 
-  async function request({ method, params = [] }: { method: string; params?: unknown[] }): Promise<unknown> {
+  /** A 401 from the paymaster proxy, on any call, clears the cached address, so the next
+   *  eth_requestAccounts opens the popup. */
+  async function request(args: { method: string; params?: unknown[] }): Promise<unknown> {
+    try {
+      return await dispatch(args);
+    } catch (e) {
+      if (e instanceof SessionExpiredError) forgetAccount();
+      throw e;
+    }
+  }
+
+  async function dispatch({ method, params = [] }: { method: string; params?: unknown[] }): Promise<unknown> {
     switch (method) {
       case "eth_chainId":
         return numberToHex(chainId);
@@ -195,7 +251,10 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
       }
       case "eth_sendTransaction": {
         const tx = (params[0] ?? {}) as CallInput & { from?: string };
-        return (await sendCalls(tx.from, [tx])).hash;
+        const sent = await sendCalls(tx.from, [tx]);
+        if (!sent.op) return sent.hash;
+        const chain = chainOf(sent.chainId) as NorKeyChain & { gas: "sponsored" };
+        return waitForUserOpTransaction(proxyFor(chain), sent.hash);
       }
       case "wallet_sendCalls": {
         const p = (params[0] ?? {}) as {
@@ -209,6 +268,9 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
         }
         for (const [name, cap] of Object.entries(p.capabilities ?? {})) {
           if (!cap?.optional) throw new ProviderRpcError(5700, `The capability "${name}" is not supported.`);
+        }
+        if (chainOf(chainId).gas === "sponsored") {
+          throw new ProviderRpcError(4200, "wallet_sendCalls on a sponsored chain is not supported yet.");
         }
         // Every batch is atomic (Calibur BATCHED_CALL), so atomicRequired is always met.
         const sent = await sendCalls(p.from ?? address ?? undefined, p.calls ?? []);

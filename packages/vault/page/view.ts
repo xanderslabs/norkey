@@ -54,22 +54,34 @@ export function showConnect(origin: string, actions: { create: () => void; exist
   );
 }
 
+/** What the consent screen shows, for both request kinds. */
+export type Consent = {
+  chainId: number;
+  from: string;
+  calls: PreparedCalls["calls"];
+  /** True when the transaction carries a 7702 authorization. */
+  delegate: boolean;
+  fee:
+    | { kind: "native"; gas: string; maxFeePerGas: string }
+    | { kind: "sponsored"; paymaster: string; nonce: string; paymasterData: string };
+};
+
 export function showConsent(
   origin: string,
-  p: PreparedCalls,
+  c: Consent,
   calibur: string,
   actions: { approve: () => void; reject: () => void },
 ) {
-  const name = chainName(p.chainId);
-  const many = p.calls.length > 1;
+  const name = chainName(c.chainId);
+  const many = c.calls.length > 1;
   const header = el("div", undefined, "details");
-  header.append(row("Chain", `${name} (${p.chainId})`), row("From", p.from));
+  header.append(row("Chain", `${name} (${c.chainId})`), row("From", c.from));
   const parts: Node[] = [
-    el("h1", many ? `Approve ${p.calls.length} calls` : "Approve transaction"),
+    el("h1", many ? `Approve ${c.calls.length} calls` : "Approve transaction"),
     el("p", `Requested by ${origin}`),
     header,
   ];
-  if (p.delegate) {
+  if (c.delegate) {
     parts.push(
       el(
         "p",
@@ -78,7 +90,7 @@ export function showConsent(
       ),
     );
   }
-  p.calls.forEach((call, i) => {
+  c.calls.forEach((call, i) => {
     const view = describeCall(call);
     const box = el("div", undefined, "details");
     box.append(el("p", many ? `${i + 1}. ${view.title}` : view.title, "label"));
@@ -87,7 +99,19 @@ export function showConsent(
     parts.push(box);
   });
   const fee = el("div", undefined, "details");
-  fee.append(row("Max network fee", `${formatEther(BigInt(p.gas) * BigInt(p.maxFeePerGas))} ETH`));
+  if (c.fee.kind === "native") {
+    fee.append(row("Max network fee", `${formatEther(BigInt(c.fee.gas) * BigInt(c.fee.maxFeePerGas))} ETH`));
+  } else {
+    // The vendor's sponsor name reaches the page only through the app, so it is not shown.
+    fee.append(el("p", `Network fee: paid by paymaster ${c.fee.paymaster}. Your wallet pays no ETH for gas.`));
+    const more = el("details");
+    more.append(
+      el("summary", "Details"),
+      row("EntryPoint nonce", c.fee.nonce),
+      el("pre", c.fee.paymasterData, "calldata"),
+    );
+    fee.append(more);
+  }
   parts.push(fee, button("Approve with passkey", actions.approve, true), button("Reject", actions.reject));
   screen(...parts);
 }

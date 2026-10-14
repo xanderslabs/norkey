@@ -1,7 +1,7 @@
-import type { PreparedCalls } from "@norkey/client/protocol";
+import type { PreparedCalls, PreparedUserOp } from "@norkey/client/protocol";
 import type { Address, Hex } from "viem";
 import type { Api } from "./api.js";
-import { signPreparedCalls } from "./calls.js";
+import { signPreparedCalls, signUserOp } from "./calls.js";
 import { createPasskey, getPasskey } from "./passkey.js";
 import { addressOf, generateWalletKey, unwrapKey, wrapKey } from "./wrap.js";
 
@@ -94,14 +94,15 @@ export async function connectExisting(api: Api): Promise<{ address: Address }> {
   }
 }
 
-export async function signCalls(api: Api, p: PreparedCalls, calibur: Address): Promise<{ raw: Hex }> {
+/** One passkey gesture: unwrap K, check it opens `from`, run `use`, then zero K and the PRF output. */
+async function withUnlockedKey<T>(api: Api, from: string, use: (key: Uint8Array) => Promise<T>): Promise<T> {
   const lo = await api.loginOptions(recalledCredential());
   const got = await getPasskey(lo.options);
   let key: Uint8Array | undefined;
   try {
     const res = await api.loginVerify(lo.challengeId, got.response);
     if (!res.wallet || !res.wrap) throw new FlowError("This passkey cannot sign for this wallet.");
-    if (res.wallet.address.toLowerCase() !== p.from.toLowerCase()) {
+    if (res.wallet.address.toLowerCase() !== from.toLowerCase()) {
       throw new FlowError("This passkey opens a different wallet than the one the app asked for.");
     }
     key = await unwrapKey({
@@ -110,11 +111,19 @@ export async function signCalls(api: Api, p: PreparedCalls, calibur: Address): P
       userId: res.userId,
       address: res.wallet.address,
     });
-    const raw = await signPreparedCalls(key, p, calibur);
+    const result = await use(key);
     rememberCredential(got.response.id);
-    return { raw };
+    return result;
   } finally {
     key?.fill(0);
     new Uint8Array(got.prfOutput).fill(0);
   }
+}
+
+export async function signCalls(api: Api, p: PreparedCalls, calibur: Address): Promise<{ raw: Hex }> {
+  return withUnlockedKey(api, p.from, async (key) => ({ raw: await signPreparedCalls(key, p, calibur) }));
+}
+
+export async function signUserOperation(api: Api, p: PreparedUserOp, calibur: Address) {
+  return withUnlockedKey(api, p.sender, (key) => signUserOp(key, p, calibur));
 }

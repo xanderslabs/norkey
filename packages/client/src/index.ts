@@ -4,7 +4,7 @@ import { createEip1193Provider, type Eip1193Provider, type NorKeyProviderConfig 
 export { CALIBUR_ADDRESS } from "./calibur.js";
 export type { Eip6963ProviderInfo } from "./eip6963.js";
 export { ProviderRpcError } from "./errors.js";
-export type { PopupReply, PopupRequest, PreparedCalls } from "./protocol.js";
+export type { PopupReply, PopupRequest, PreparedCalls, PreparedUserOp } from "./protocol.js";
 export type { Eip1193Provider, NorKeyChain, NorKeyProviderConfig } from "./provider.js";
 
 // Placeholder rdns until the product domain is decided (spec section 13).

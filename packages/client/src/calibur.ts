@@ -1,4 +1,15 @@
-import { type Address, encodeAbiParameters, encodeFunctionData, type Hex, parseAbi, parseAbiParameters } from "viem";
+import {
+  type Address,
+  concat,
+  encodeAbiParameters,
+  encodeFunctionData,
+  type Hex,
+  parseAbi,
+  parseAbiParameters,
+  type SignedAuthorization,
+} from "viem";
+import { entryPoint08Address, type UserOperation } from "viem/account-abstraction";
+import type { PreparedUserOp } from "./protocol.js";
 
 /** Uniswap's Calibur, the same runtime code on every chain NorKey supports
  *  (NorKey-internal/probes/calibur-addresses.md). The vault CLI repeats this default. */
@@ -21,4 +32,44 @@ export function encodeExecute(calls: readonly Call[]): Hex {
 /** True when `code` is the EIP-7702 designator for `calibur`. A designator for any other address is false. */
 export function isDelegatedTo(code: Hex | undefined, calibur: Address): boolean {
   return (code ?? "0x").toLowerCase() === `0xef0100${calibur.slice(2)}`.toLowerCase();
+}
+
+/** EntryPoint v0.8: Calibur trusts it unless the account calls updateEntryPoint, a self-call the
+ *  boundary page refuses (NorKey-internal/probes/paymaster-7677.md, section 1). */
+export const ENTRY_POINT: Address = entryPoint08Address;
+
+/** Calibur's executeUserOp(PackedUserOperation,bytes32). The EntryPoint calls it, and Calibur decodes
+ *  BatchedCall from the callData after this selector. */
+const EXECUTE_USER_OP: Hex = "0x8dd7712f";
+const BATCHED_CALL = parseAbiParameters("((address to, uint256 value, bytes data)[] calls, bool revertOnFailure)");
+
+/** callData for a user operation. revertOnFailure is true, so the batch is atomic, as BATCHED_CALL
+ *  mode is for a self-call. Not Avok's execute(MODE_BATCH, ...): the EntryPoint cannot call that. */
+export function encodeExecuteUserOp(calls: readonly Call[]): Hex {
+  const batch = { calls: calls.map((c) => ({ to: c.to, value: c.value, data: c.data })), revertOnFailure: true };
+  return concat([EXECUTE_USER_OP, encodeAbiParameters(BATCHED_CALL, [batch])]);
+}
+
+/**
+ * The user operation a PreparedUserOp describes. The boundary page hashes this and the provider
+ * submits it, so neither can drift from the other. The authorization rides as eip7702Auth, with no
+ * factory field (probe, section 6). The caller sets `signature`.
+ */
+export function userOperationFrom(p: PreparedUserOp, authorization?: SignedAuthorization): UserOperation<"0.8"> {
+  return {
+    sender: p.sender,
+    nonce: BigInt(p.nonce),
+    callData: encodeExecuteUserOp(p.calls.map((c) => ({ to: c.to, value: BigInt(c.value), data: c.data }))),
+    callGasLimit: BigInt(p.callGasLimit),
+    verificationGasLimit: BigInt(p.verificationGasLimit),
+    preVerificationGas: BigInt(p.preVerificationGas),
+    maxFeePerGas: BigInt(p.maxFeePerGas),
+    maxPriorityFeePerGas: BigInt(p.maxPriorityFeePerGas),
+    paymaster: p.paymaster,
+    paymasterVerificationGasLimit: BigInt(p.paymasterVerificationGasLimit),
+    paymasterPostOpGasLimit: BigInt(p.paymasterPostOpGasLimit),
+    paymasterData: p.paymasterData,
+    signature: "0x",
+    ...(authorization ? { authorization } : {}),
+  };
 }

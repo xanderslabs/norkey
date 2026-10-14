@@ -1,4 +1,4 @@
-import { createNorKeyProvider } from "@norkey/client";
+import { createNorKeyProvider, type NorKeyChain } from "@norkey/client";
 import {
   type Address,
   type Chain,
@@ -19,11 +19,16 @@ const rpcs: Record<number, string> = {
 const chains: Record<number, Chain> = { [sepolia.id]: sepolia, [unichainSepolia.id]: unichainSepolia };
 const vaultOrigin: string = import.meta.env.VITE_VAULT_ORIGIN ?? "http://localhost:5174";
 
-const norkey = createNorKeyProvider({
-  vaultOrigin,
-  chains: Object.entries(rpcs).map(([id, url]) => ({ id: Number(id), rpcUrls: [url], gas: "native" as const })),
-  defaultChainId: sepolia.id,
-});
+// Comma-separated chain ids whose sends the paymaster pays for, e.g. "11155111".
+const sponsored = new Set((import.meta.env.VITE_SPONSORED ?? "").split(",").filter(Boolean).map(Number));
+const api: string = import.meta.env.VITE_API ?? "http://localhost:8787/norkey";
+const norkeyChains = Object.entries(rpcs).map(
+  ([id, url]): NorKeyChain =>
+    sponsored.has(Number(id))
+      ? { id: Number(id), rpcUrls: [url], gas: "sponsored", paymasterUrl: `${api}/paymaster/${id}` }
+      : { id: Number(id), rpcUrls: [url], gas: "native" },
+);
+const norkey = createNorKeyProvider({ vaultOrigin, chains: norkeyChains, defaultChainId: sepolia.id });
 const wallet = createWalletClient({ transport: custom(norkey) });
 const readers = new Map<number, PublicClient>();
 let chain: Chain = sepolia;
@@ -71,12 +76,16 @@ $("send").addEventListener("click", async () => {
   try {
     const to = ($("to") as HTMLInputElement).value.trim() as Address;
     const value = parseEther(($("amount") as HTMLInputElement).value.trim());
+    // Nothing is awaited before sendTransaction, so the popup opens inside the click's user activation.
     const hash = await wallet.sendTransaction({ account, chain, to, value });
     log(`sent ${hash} ${chain.blockExplorers?.default.url}/tx/${hash}`);
     const receipt = await reader().waitForTransactionReceipt({ hash });
     log(`confirmed in block ${receipt.blockNumber} (${receipt.status})`);
     const sent = await reader().getTransaction({ hash });
     log(`type ${sent.type}${sent.type === "eip7702" ? " (delegated to Calibur in this transaction)" : ""}`);
+    const before = await reader().getBalance({ address: account, blockNumber: receipt.blockNumber - 1n });
+    const after = await reader().getBalance({ address: account, blockNumber: receipt.blockNumber });
+    log(`ETH spent on gas: ${formatEther(before - after - value)}`);
     await refresh();
   } catch (e) {
     report(e);
