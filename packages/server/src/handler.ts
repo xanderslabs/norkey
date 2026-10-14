@@ -1,6 +1,7 @@
 import { AuthError, loginOptions, loginVerify, registerOptions, registerVerify } from "./auth/passkey.js";
 import { issueSession, readSession } from "./auth/session.js";
 import { type NorKeyHandlerConfig, resolveConfig } from "./config.js";
+import { proxyPaymaster } from "./routes/paymaster.js";
 import { createWallet } from "./routes/wallet.js";
 
 /** A Web-standard fetch handler. Mount it at `basePath` in any framework that speaks Request/Response. */
@@ -8,8 +9,14 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
   const config = resolveConfig(input);
 
   return async (req) => {
+    const path = new URL(req.url).pathname;
+    const sub = path.startsWith(`${config.basePath}/`) ? path.slice(config.basePath.length) : null;
+    const proxyChain = sub === null ? null : /^\/paymaster\/(\d+)$/.exec(sub)?.[1];
+    // The app page may call the paymaster proxy and nothing else. `origins` is also WebAuthn's
+    // expected origin, and a passkey login releases the wrap, so the two lists never mix.
+    const allowList = proxyChain ? config.appOrigins : config.origins;
     const origin = req.headers.get("origin");
-    const allowed = origin !== null && config.origins.includes(origin);
+    const allowed = origin !== null && allowList.includes(origin);
     const cors: Record<string, string> = allowed
       ? { "access-control-allow-origin": origin, "access-control-allow-credentials": "true", vary: "Origin" }
       : { vary: "Origin" };
@@ -19,9 +26,8 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
         headers: { "content-type": "application/json", ...cors, ...extra },
       });
 
-    const path = new URL(req.url).pathname;
-    if (!path.startsWith(`${config.basePath}/`)) return json(404, { error: "not found" });
-    const route = `${req.method} ${path.slice(config.basePath.length)}`;
+    if (sub === null) return json(404, { error: "not found" });
+    const route = `${req.method} ${sub}`;
 
     if (req.method === "OPTIONS") {
       if (!allowed) return new Response(null, { status: 403 });
@@ -47,6 +53,17 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
     }
 
     try {
+      if (proxyChain && req.method === "POST") {
+        const chainId = Number(proxyChain);
+        const entry = config.paymasterProxy?.[chainId];
+        if (!entry) return json(404, { error: "not found" });
+        const userId = await readSession(config, req);
+        const wallet = userId ? await config.storage.getWallet(userId) : null;
+        // No wallet answers 401 too: "connect again" finishes an orphaned setup (slice 2).
+        if (!userId || !wallet) return json(401, { error: "not signed in" });
+        const r = await proxyPaymaster(entry, { chainId, userId, address: wallet.address, body });
+        return json(r.status, r.body);
+      }
       switch (route) {
         case "POST /register/options":
           return json(200, await registerOptions(config));
