@@ -1,6 +1,6 @@
 import { encodeExecute } from "@norkey/client/calibur";
 import { MAX_CALLS, type PreparedCalls } from "@norkey/client/protocol";
-import { type Address, type Hex, isAddress, isHex } from "viem";
+import { type Address, type Hex, isAddress, isHex, zeroAddress } from "viem";
 import type { PageConfig } from "./config.js";
 import { accountFromKey } from "./key-account.js";
 
@@ -37,8 +37,14 @@ export function validateCalls(input: unknown, chains: PageConfig["chains"]): Pre
     if (typeof call?.to !== "string" || !isAddress(call.to, { strict: false })) {
       throw new RequestError("A call has no valid recipient.");
     }
+    // Calibur runs a call to the account, or to address(0), as the account itself: as the root key it
+    // could reach admin functions such as registering a key. The consent screen cannot show that.
+    const to = call.to.toLowerCase();
+    if (to === c.from.toLowerCase() || to === zeroAddress) {
+      throw new RequestError("A call to the wallet itself is not supported.");
+    }
     if (!quantity(call.value)) throw new RequestError("A call's value is not a hex quantity.");
-    if (typeof call.data !== "string" || !isHex(call.data, { strict: true })) {
+    if (typeof call.data !== "string" || !isHex(call.data, { strict: true }) || call.data.length % 2 !== 0) {
       throw new RequestError("A call's data is not hex.");
     }
   }

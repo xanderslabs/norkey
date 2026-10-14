@@ -1,4 +1,13 @@
-import { type Address, createPublicClient, fallback, type Hex, http, numberToHex, type PublicClient } from "viem";
+import {
+  type Address,
+  createPublicClient,
+  fallback,
+  type Hex,
+  http,
+  numberToHex,
+  type PublicClient,
+  zeroAddress,
+} from "viem";
 import { CALIBUR_ADDRESS, type Call, isDelegatedTo } from "./calibur.js";
 import { callsId, callsStatus, parseCallsId } from "./eip5792.js";
 import { ProviderRpcError } from "./errors.js";
@@ -100,6 +109,13 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
       throw new ProviderRpcError(-32602, `Send between 1 and ${MAX_CALLS} calls.`);
     }
     if (input.some((c) => !c.to)) throw new ProviderRpcError(-32602, "Contract creation is not supported.");
+    // The boundary page refuses these too: as the account itself, a call could reach Calibur's admin functions.
+    if (input.some((c) => [address?.toLowerCase(), zeroAddress].includes(c.to?.toLowerCase()))) {
+      throw new ProviderRpcError(-32602, "A call to the wallet itself is not supported.");
+    }
+    if (input.some((c) => c.data && c.data.length % 2 !== 0)) {
+      throw new ProviderRpcError(-32602, "Call data must be whole bytes.");
+    }
     const sender = address;
     const id = chainId;
     const client = readerFor(id);

@@ -98,6 +98,24 @@ describe("signing calls", () => {
     expect(() => validateCalls(request(from, { calls: [] }), chains)).toThrow(RequestError);
   });
 
+  // A call to the account itself, or to address(0) (Calibur runs it on the account), passes Calibur's
+  // onlyThis check as the root key: it could register an attacker's key behind a "Contract call" row.
+  it("refuses a call to the account itself or to address zero", () => {
+    const { from } = wallet();
+    for (const to of [from, lower(from), "0x0000000000000000000000000000000000000000"] as `0x${string}`[]) {
+      const req = request(from, { calls: [{ to, value: "0x0", data: "0x12345678" }] });
+      expect(() => validateCalls(req, chains)).toThrow(RequestError);
+    }
+  });
+
+  // Odd-length data is padded differently when signed than when decoded for consent, so the screen
+  // would not show what is signed.
+  it("refuses odd-length call data", () => {
+    const { from } = wallet();
+    const req = request(from, { calls: [{ to: A, value: "0x0", data: "0xabc" }] });
+    expect(() => validateCalls(req, chains)).toThrow(RequestError);
+  });
+
   it("treats a designator for any other contract as not delegated", () => {
     const other = "0x00000000000000000000000000000000000BAD00";
     expect(isDelegatedTo(`0xef0100${CALIBUR_ADDRESS.slice(2).toLowerCase()}`, CALIBUR_ADDRESS)).toBe(true);
