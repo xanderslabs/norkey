@@ -73,7 +73,7 @@ export function showConsent(
     parts.push(
       el(
         "p",
-        `This is your wallet's first transaction on ${name}. It also upgrades your wallet with Uniswap's Calibur contract (${calibur}), which lets it batch calls. The upgrade stays in place until it is replaced.`,
+        `This transaction upgrades your wallet on ${name} with Uniswap's Calibur contract (${calibur}), which lets it batch calls. It replaces any earlier upgrade and stays in place until it is replaced.`,
         "notice",
       ),
     );
