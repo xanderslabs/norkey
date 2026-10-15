@@ -48,6 +48,13 @@ The journey starts Anvil (a Sepolia fork), the server, the boundary page, and th
 virtual authenticator. It needs `anvil` on your PATH and network access to fork Sepolia. Read the header of
 `e2e/journey.mjs` for why it swaps the popup for an iframe.
 
+```sh
+pnpm build && pnpm --filter demo e2e:sponsored
+```
+
+The sponsored journey forks Sepolia and runs Pimlico's Alto bundler and mock paymaster locally, so
+it needs no API key.
+
 ## Sponsored gas
 
 A chain set to `gas: "sponsored"` sends every transaction as an ERC-4337 user operation that your
@@ -61,6 +68,16 @@ NORKEY_RP_ID=localhost NORKEY_ORIGINS=http://localhost:5174 NORKEY_APP_ORIGINS=h
 NORKEY_PAYMASTER_11155111=https://api.candide.dev/public/v3/11155111 \
 NORKEY_PAYMASTER_ALLOW=all NORKEY_DB=./demo.db node packages/server/dist/serve.js
 ```
+
+Then start the app with the sponsored chains listed:
+
+```sh
+VITE_SPONSORED=11155111 pnpm --filter demo dev
+```
+
+Chains not listed stay on native gas. A wallet with no ETH can send zero-value transactions on a
+sponsored chain. The first one upgrades the wallet to Calibur inside the sponsored bundle. Sending
+ETH still needs the ETH you send.
 
 Candide's public endpoint sponsors on Sepolia with no key. A keyed vendor URL goes in the same
 variable, for example `https://api.pimlico.io/v2/11155111/rpc?apikey=<key>`, and its policy goes in
