@@ -204,7 +204,8 @@ describe("paymaster proxy", () => {
     expect(JSON.parse(pathText).error.message).toMatch(/^rejected by/);
 
     // The key can also sit in the URL's user name or password, appear percent-encoded or decoded, or be
-    // a path segment shorter than 16 characters.
+    // a path segment shorter than 16 characters. It can also hold a raw "+" in a query value, or sit in
+    // the query as a bare name with no "=".
     const cases = [
       {
         url: "https://keyuser:keypass99@bundler.example/rpc",
@@ -220,6 +221,16 @@ describe("paymaster proxy", () => {
         url: "https://bundler.example/v1/KEY01234/rpc",
         message: "unknown project KEY01234",
         secrets: ["KEY01234"],
+      },
+      {
+        url: "https://api.pimlico.io/v2/11155111/rpc?apikey=pim_ab+cd12",
+        message: "invalid apikey pim_ab+cd12",
+        secrets: ["pim_ab+cd12"],
+      },
+      {
+        url: "https://bundler.example/rpc?SECRETKEY1234",
+        message: "bad request SECRETKEY1234",
+        secrets: ["SECRETKEY1234"],
       },
     ];
     const leaks: string[] = [];
