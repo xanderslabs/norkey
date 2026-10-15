@@ -11,6 +11,7 @@ import {
 import type { ResolvedConfig } from "../config.js";
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+const LABEL_MAX = 64;
 
 export class AuthError extends Error {
   constructor() {
@@ -19,12 +20,27 @@ export class AuthError extends Error {
   }
 }
 
-export async function registerOptions(config: ResolvedConfig) {
+/** The passkey's display name in the browser's picker. The app's label, trimmed, without control or
+ *  bidirectional control characters, at most 64 characters. Empty or missing gives "NorKey wallet"
+ *  and the first 6 hex characters of the random user id. Display only: not unique, not stored. */
+function passkeyName(label: unknown, userID: Uint8Array): string {
+  const clean =
+    typeof label === "string"
+      ? Array.from(label.replace(/[\p{Cc}\p{Bidi_Control}]/gu, "").trim())
+          .slice(0, LABEL_MAX)
+          .join("")
+          .trim()
+      : "";
+  return clean || `NorKey wallet ${Buffer.from(userID).toString("hex").slice(0, 6)}`;
+}
+
+export async function registerOptions(config: ResolvedConfig, label?: unknown) {
+  const userID = randomBytes(16);
   const options = await generateRegistrationOptions({
     rpName: config.rpName ?? config.rpId,
     rpID: config.rpId,
-    userName: "NorKey wallet",
-    userID: randomBytes(16),
+    userName: passkeyName(label, userID),
+    userID,
     attestationType: "none",
     authenticatorSelection: {
       residentKey: "required",

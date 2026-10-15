@@ -51,7 +51,8 @@ export type AuthorizationReply = {
 };
 
 export type PopupRequest =
-  | { v: 3; id: string; kind: "connect" }
+  /** `label` names a new passkey in the browser's picker. A page that ignores it uses the default. */
+  | { v: 3; id: string; kind: "connect"; label?: string }
   | { v: 3; id: string; kind: "sign-calls"; calls: PreparedCalls }
   | { v: 3; id: string; kind: "sign-userop"; op: PreparedUserOp };
 

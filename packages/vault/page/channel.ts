@@ -11,6 +11,10 @@ export function acceptRequest(event: MessageEvent, appOrigins: string[]): PopupR
   if (!d || d.v !== PROTOCOL_VERSION || typeof d.id !== "string") return null;
   if (d.kind !== "connect" && d.kind !== "sign-calls" && d.kind !== "sign-userop") return null;
   requesterOrigin = event.origin;
+  // The label is display text for the passkey picker. Anything but a string is dropped.
+  if (d.kind === "connect" && d.label !== undefined && typeof d.label !== "string") {
+    return { v: PROTOCOL_VERSION, id: d.id, kind: "connect" };
+  }
   return d as PopupRequest;
 }
 

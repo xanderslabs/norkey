@@ -34,8 +34,11 @@ export function createApi(apiUrl: string) {
     return json as T;
   }
   return {
-    registerOptions: () =>
-      call<{ challengeId: string; options: PublicKeyCredentialCreationOptionsJSON }>("/register/options", {}),
+    registerOptions: (label?: string) =>
+      call<{ challengeId: string; options: PublicKeyCredentialCreationOptionsJSON }>(
+        "/register/options",
+        label === undefined ? {} : { label },
+      ),
     registerVerify: (challengeId: string, response: RegistrationResponseJSON) =>
       call<{ userId: string }>("/register/verify", { challengeId, response }),
     loginOptions: (credentialId?: string) =>

@@ -71,7 +71,7 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
       }
       switch (route) {
         case "POST /register/options":
-          return json(200, await registerOptions(config));
+          return json(200, await registerOptions(config, body.label));
         case "POST /register/verify": {
           const userId = await registerVerify(config, String(body.challengeId), body.response as never);
           return json(200, { userId }, { "set-cookie": await issueSession(config, userId) });

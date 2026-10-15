@@ -51,8 +51,8 @@ async function createWalletUnder(
   }
 }
 
-export async function connectCreate(api: Api): Promise<{ address: Address }> {
-  const { challengeId, options } = await api.registerOptions();
+export async function connectCreate(api: Api, label?: string): Promise<{ address: Address }> {
+  const { challengeId, options } = await api.registerOptions(label);
   const created = await createPasskey(options);
   let prf = created.prfOutput;
   try {

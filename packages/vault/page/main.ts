@@ -63,7 +63,7 @@ function handle(req: PopupRequest, origin: string): void {
       }
     };
     showConnect(origin, {
-      create: run(() => connectCreate(api)),
+      create: run(() => connectCreate(api, req.label)),
       existing: run(() => connectExisting(api)),
       cancel: reject(req.id),
     });

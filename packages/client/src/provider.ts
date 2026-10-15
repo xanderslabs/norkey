@@ -44,6 +44,9 @@ export type NorKeyProviderConfig = {
   apiUrl: string;
   chains: NorKeyChain[];
   defaultChainId: number;
+  /** Names a new wallet's passkey in the browser's picker, e.g. the signed-in user's email. Called when
+   *  the connect popup opens. Missing or blank gives "NorKey wallet" and 6 random hex characters. */
+  label?: () => string | undefined;
 };
 
 export type Eip1193Provider = {
@@ -238,7 +241,13 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
         return address ? [address] : [];
       case "eth_requestAccounts": {
         if (address) return [address];
-        const reply = await ask("connect", async (id) => ({ v: PROTOCOL_VERSION, id, kind: "connect" }));
+        const label = config.label?.();
+        const reply = await ask("connect", async (id) => ({
+          v: PROTOCOL_VERSION,
+          id,
+          kind: "connect",
+          ...(typeof label === "string" ? { label } : {}),
+        }));
         address = reply.address;
         save(address);
         emit("connect", { chainId: numberToHex(chainId) });
