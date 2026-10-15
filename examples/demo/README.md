@@ -15,8 +15,11 @@ Then start three processes from the repo root.
 1. The server:
 
    ```sh
-   NORKEY_RP_ID=localhost NORKEY_ORIGINS=http://localhost:5174 NORKEY_DB=./demo.db node packages/server/dist/serve.js
+   NORKEY_RP_ID=localhost NORKEY_ORIGINS=http://localhost:5174 NORKEY_APP_ORIGINS=http://localhost:5173 \
+   NORKEY_DB=./demo.db node packages/server/dist/serve.js
    ```
+
+   `NORKEY_APP_ORIGINS` lets the app's **Disconnect** end the server session.
 
 2. The boundary page:
 
@@ -37,6 +40,13 @@ Set `VITE_UNICHAIN_SEPOLIA_RPC` to use your own Unichain Sepolia RPC.
 
 The Unichain Sepolia address needs its own test ETH, for example bridged from Sepolia or from a
 faucet.
+
+**Disconnect** calls `wallet_revokePermissions`. The provider posts to `<apiUrl>/logout`, which
+deletes the server session and expires its cookie, then forgets the address. The next **Connect**
+asks for a passkey again. The demo sets `apiUrl` from `VITE_API` (default
+`http://localhost:8787/norkey`), the same value the boundary page is built with (`--api`). Keep
+`apiUrl` on the same site as the app: the session cookie is `SameSite=Lax`, so a cross-site
+`apiUrl` would not carry it.
 
 ## End-to-end journey
 
@@ -83,8 +93,8 @@ Candide's public endpoint sponsors on Sepolia with no key. A keyed vendor URL go
 variable, for example `https://api.pimlico.io/v2/11155111/rpc?apikey=<key>`, and its policy goes in
 `NORKEY_PAYMASTER_CONTEXT_11155111`, for example `'{"sponsorshipPolicyId":"<policy id>"}'`.
 
-- `NORKEY_APP_ORIGINS` may call only the paymaster route. Do not add the app origin to
-  `NORKEY_ORIGINS`: that list is also WebAuthn's expected origin.
+- `NORKEY_APP_ORIGINS` may call only the paymaster route and `/logout`. Do not add the app origin
+  to `NORKEY_ORIGINS`: that list is also WebAuthn's expected origin.
 - `NORKEY_PAYMASTER_ALLOW=all` sponsors every signed-in user, and anyone can sign up. Set per-sender
   and total limits in your paymaster's dashboard. They are the only cap on what you spend. To decide
   per user, mount `createNorKeyHandler` yourself and write `allow`.

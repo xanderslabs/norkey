@@ -28,7 +28,7 @@ const norkeyChains = Object.entries(rpcs).map(
       ? { id: Number(id), rpcUrls: [url], gas: "sponsored", paymasterUrl: `${api}/paymaster/${id}` }
       : { id: Number(id), rpcUrls: [url], gas: "native" },
 );
-const norkey = createNorKeyProvider({ vaultOrigin, chains: norkeyChains, defaultChainId: sepolia.id });
+const norkey = createNorKeyProvider({ vaultOrigin, apiUrl: api, chains: norkeyChains, defaultChainId: sepolia.id });
 const wallet = createWalletClient({ transport: custom(norkey) });
 const readers = new Map<number, PublicClient>();
 let chain: Chain = sepolia;
@@ -66,6 +66,20 @@ $("connect").addEventListener("click", async () => {
     await refresh();
   } catch (e) {
     report(e);
+  }
+});
+
+$("disconnect").addEventListener("click", async () => {
+  try {
+    await norkey.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] });
+    log("disconnected");
+  } catch (e) {
+    report(e);
+  } finally {
+    // The provider forgets the account even when the server call fails.
+    account = undefined;
+    $("address").textContent = "not connected";
+    $("balance").textContent = "-";
   }
 });
 

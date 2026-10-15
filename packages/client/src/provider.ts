@@ -39,6 +39,9 @@ export type NorKeyChain =
 export type NorKeyProviderConfig = {
   /** The boundary page origin, e.g. "https://accounts.app.com". */
   vaultOrigin: string;
+  /** The NorKey server handler's base, e.g. "/norkey", the same value the boundary page is built with
+   *  (`--api`). A relative URL resolves against the app page. Disconnect calls `<apiUrl>/logout`. */
+  apiUrl: string;
   chains: NorKeyChain[];
   defaultChainId: number;
 };
@@ -61,6 +64,9 @@ function validate(config: NorKeyProviderConfig): void {
   }
   if (new URL(config.vaultOrigin).origin !== config.vaultOrigin) {
     throw new Error(`NorKey: vaultOrigin "${config.vaultOrigin}" must be a bare origin`);
+  }
+  if (typeof config.apiUrl !== "string" || config.apiUrl === "") {
+    throw new Error('NorKey: apiUrl is required, e.g. "/norkey"');
   }
   if (!config.chains.some((c) => c.id === config.defaultChainId)) {
     throw new Error(`NorKey: defaultChainId ${config.defaultChainId} is not in chains`);
@@ -238,6 +244,19 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
         emit("connect", { chainId: numberToHex(chainId) });
         emit("accountsChanged", [address]);
         return [address];
+      }
+      case "wallet_revokePermissions": {
+        // EIP-2255 disconnect. The page forgets the account even when the server call fails, then says so.
+        let ended = false;
+        try {
+          const url = new URL(`${config.apiUrl.replace(/\/$/, "")}/logout`, globalThis.location?.href);
+          ended = (await fetch(url.href, { method: "POST", credentials: "include" })).ok;
+        } catch {}
+        forgetAccount();
+        if (!ended) {
+          throw new ProviderRpcError(-32603, "Disconnected on this page, but the server session could not be ended.");
+        }
+        return null;
       }
       case "wallet_switchEthereumChain": {
         const id = Number((params[0] as { chainId?: string } | undefined)?.chainId);

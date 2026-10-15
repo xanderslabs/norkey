@@ -100,6 +100,9 @@ export function sqlite(path: string): NorKeyStorage {
       if (!r || Number(r.expires_at) < Date.now()) return null;
       return r.user_id as string;
     },
+    async deleteSession(tokenHash) {
+      db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(tokenHash);
+    },
     async createWallet(userId, address, wrap) {
       db.exec("BEGIN");
       try {

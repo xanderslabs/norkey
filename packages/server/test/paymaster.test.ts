@@ -243,3 +243,22 @@ describe("paymaster proxy", () => {
     expect(make).toThrow(/cannot be in both origins and appOrigins/);
   });
 });
+
+describe("sessions", () => {
+  it("ends the session on logout: the same cookie gets 401 and the reply expires it", async () => {
+    // Why: Disconnect must end the session on the server too. If logout only cleared the page, the
+    // cookie would keep spending sponsorship for 7 days, and on a shared computer the next person
+    // would still be signed in.
+    const { rpc, post } = await setup();
+    expect((await rpc(stubCall())).status).toBe(200);
+    const out = await post("/logout", {});
+    expect(out.status).toBe(204);
+    const cookie = out.headers.get("set-cookie") ?? "";
+    expect(cookie).toMatch(/^norkey_session=;/);
+    expect(cookie).toContain("Max-Age=0");
+    expect(cookie).toContain("Path=/");
+    expect((await rpc(stubCall())).status).toBe(401);
+    // Idempotent: no session still answers 204.
+    expect((await post("/logout", {})).status).toBe(204);
+  });
+});

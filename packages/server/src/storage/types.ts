@@ -28,6 +28,8 @@ export interface NorKeyStorage {
   takeChallenge(id: string): Promise<{ challenge: string; userId: string | null } | null>;
   createSession(s: { tokenHash: string; userId: string; expiresAt: number }): Promise<void>;
   getSessionUser(tokenHash: string): Promise<string | null>;
+  /** Deletes the session with this token hash. A missing session is not an error. */
+  deleteSession(tokenHash: string): Promise<void>;
   /** Wallet row and its first wrap in one transaction. Throws WalletExistsError if one exists. */
   createWallet(userId: string, address: string, wrap: StoredWrap): Promise<void>;
   getWallet(userId: string): Promise<{ address: string } | null>;

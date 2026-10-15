@@ -1,5 +1,5 @@
 import { AuthError, loginOptions, loginVerify, registerOptions, registerVerify } from "./auth/passkey.js";
-import { issueSession, readSession } from "./auth/session.js";
+import { endSession, issueSession, readSession } from "./auth/session.js";
 import { type NorKeyHandlerConfig, resolveConfig } from "./config.js";
 import { proxyPaymaster } from "./routes/paymaster.js";
 import { createWallet } from "./routes/wallet.js";
@@ -12,9 +12,14 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
     const path = new URL(req.url).pathname;
     const sub = path.startsWith(`${config.basePath}/`) ? path.slice(config.basePath.length) : null;
     const proxyChain = sub === null ? null : /^\/paymaster\/(\d+)$/.exec(sub)?.[1];
-    // The app page may call the paymaster proxy and nothing else. `origins` is also WebAuthn's
-    // expected origin, and a passkey login releases the wrap, so the two lists never mix.
-    const allowList = proxyChain ? config.appOrigins : config.origins;
+    // The app page may call the paymaster proxy and POST /logout, nothing else. `origins` is also
+    // WebAuthn's expected origin, and a passkey login releases the wrap, so the two lists never mix.
+    // Logout takes both: it can only end a session, never reveal or start one.
+    const allowList = proxyChain
+      ? config.appOrigins
+      : sub === "/logout"
+        ? [...config.origins, ...config.appOrigins]
+        : config.origins;
     const origin = req.headers.get("origin");
     const allowed = origin !== null && allowList.includes(origin);
     const cors: Record<string, string> = allowed
@@ -88,6 +93,12 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
           const r = await createWallet(config, userId, body);
           return json(r.status, r.body);
         }
+        case "POST /logout":
+          // 204 carries no body, so this skips json(). No session answers 204 too: logout is idempotent.
+          return new Response(null, {
+            status: 204,
+            headers: { ...cors, "set-cookie": await endSession(config, req) },
+          });
         case "GET /wallet": {
           const userId = await readSession(config, req);
           if (!userId) return json(401, { error: "not signed in" });
