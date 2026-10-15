@@ -112,6 +112,14 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
   let address = load();
   const clients = new Map<number, PublicClient>();
   const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+  /** The sponsored operation still pending, per "<chainId>:<account>". Two in a row would read the same
+   *  EntryPoint nonce, and the bundler would refuse the second after the user approved it. In memory
+   *  only: a reload or the end of the 60 second wait falls back to that refusal. */
+  const pending = new Map<string, Hex>();
+  const pendingKey = (id: number, account: string) => `${id}:${account.toLowerCase()}`;
+  const clearPending = (hash: Hex) => {
+    for (const [k, h] of pending) if (h.toLowerCase() === hash.toLowerCase()) pending.delete(k);
+  };
 
   const emit = (event: string, ...args: unknown[]) => {
     for (const l of [...(listeners.get(event) ?? [])]) l(...args);
@@ -149,7 +157,7 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
   async function sendCalls(
     from: string | undefined,
     input: CallInput[],
-  ): Promise<{ chainId: number; hash: Hex; op: boolean }> {
+  ): Promise<{ chainId: number; hash: Hex; op: boolean; landed?: Promise<Hex> }> {
     if (!address || from?.toLowerCase() !== address.toLowerCase()) {
       throw new ProviderRpcError(4100, "The requested account is not connected.");
     }
@@ -185,6 +193,13 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
     }));
     const chain = chainOf(id);
     if (chain.gas === "sponsored") {
+      // Refused before ask, so no popup opens and no passkey prompt is wasted.
+      if (pending.has(pendingKey(id, sender))) {
+        throw new ProviderRpcError(
+          -32603,
+          "Your last transaction on this chain is still pending. Try again when it lands.",
+        );
+      }
       const proxyUrl = proxyFor(chain);
       let prepared: PreparedUserOp | undefined;
       const reply = await ask("sign-userop", async (rid) => {
@@ -193,7 +208,15 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
       });
       // ask resolves only after prepare ran, so prepared is set.
       const hash = await submitUserOp(proxyUrl, prepared as PreparedUserOp, reply.signature, reply.authorization);
-      return { chainId: id, hash, op: true };
+      pending.set(pendingKey(id, sender), hash);
+      // One wait per operation: eth_sendTransaction returns it, wallet_sendCalls leaves it running in
+      // the background. This handler is attached first, so the flag clears before the app sees the result.
+      const landed = waitForUserOpTransaction(proxyUrl, hash, id);
+      landed.then(
+        () => clearPending(hash),
+        () => clearPending(hash),
+      );
+      return { chainId: id, hash, op: true, landed };
     }
     const { raw } = await ask("sign-calls", async (rid) => {
       const [code, nonce, fees] = await Promise.all([
@@ -279,9 +302,7 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
       case "eth_sendTransaction": {
         const tx = (params[0] ?? {}) as CallInput & { from?: string };
         const sent = await sendCalls(tx.from, [tx]);
-        if (!sent.op) return sent.hash;
-        const chain = chainOf(sent.chainId) as NorKeyChain & { gas: "sponsored" };
-        return waitForUserOpTransaction(proxyFor(chain), sent.hash, sent.chainId);
+        return sent.landed ?? sent.hash;
       }
       case "wallet_sendCalls": {
         const p = (params[0] ?? {}) as {
@@ -308,7 +329,10 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
         const chain = chainOf(parsed.chainId);
         if (parsed.op) {
           if (chain.gas !== "sponsored") throw new ProviderRpcError(5730, "Unknown bundle id.");
-          return userOpCallsStatus(proxyFor(chain), params[0] as string, parsed.chainId, parsed.hash);
+          const status = await userOpCallsStatus(proxyFor(chain), params[0] as string, parsed.chainId, parsed.hash);
+          // The app can see the operation land before the background wait does.
+          if (status.status !== 100) clearPending(parsed.hash);
+          return status;
         }
         return callsStatus(readerFor(parsed.chainId), params[0] as string, parsed.chainId, parsed.hash);
       }
