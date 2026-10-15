@@ -202,6 +202,37 @@ describe("paymaster proxy", () => {
     const pathText = await (await second.rpc(stubCall())).text();
     expect(pathText).not.toContain(PATH_KEY);
     expect(JSON.parse(pathText).error.message).toMatch(/^rejected by/);
+
+    // The key can also sit in the URL's user name or password, appear percent-encoded or decoded, or be
+    // a path segment shorter than 16 characters.
+    const cases = [
+      {
+        url: "https://keyuser:keypass99@bundler.example/rpc",
+        message: "unauthorized: keyuser / keypass99",
+        secrets: ["keyuser", "keypass99"],
+      },
+      {
+        url: "https://bundler.example/v1/AB%2BCD%2B0123456789/rpc?apikey=K%2FEY%3D012345",
+        message: "bad key K%2FEY%3D012345 for AB+CD+0123456789",
+        secrets: ["K%2FEY%3D012345", "AB+CD+0123456789"],
+      },
+      {
+        url: "https://bundler.example/v1/KEY01234/rpc",
+        message: "unknown project KEY01234",
+        secrets: ["KEY01234"],
+      },
+    ];
+    const leaks: string[] = [];
+    for (const c of cases) {
+      const s = await setup(
+        undefined,
+        (req) => ({ jsonrpc: "2.0", id: req.id, error: { code: -32003, message: c.message } }),
+        c.url,
+      );
+      const text = await (await s.rpc(stubCall())).text();
+      for (const secret of c.secrets) if (text.includes(secret)) leaks.push(secret);
+    }
+    expect(leaks).toEqual([]);
   });
 
   it("keeps app origins away from the passkey routes", async () => {

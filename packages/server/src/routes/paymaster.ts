@@ -65,12 +65,23 @@ export async function proxyPaymaster(
 
 /** An upstream message can quote the URL, key included, or carry viem-style "URL:" and "Request body:"
  *  lines. Keep the first line, replace every URL of any scheme, then the configured URL's host and path
- *  (no scheme), its query values and any path segment long enough to be a key. Cap the length. */
+ *  (no scheme), its query values, its user name and password, and any path segment long enough to be a
+ *  key, each also percent-encoded and decoded. Longest first, so a shorter secret cannot break a longer
+ *  one. Short values may be over-redacted; that is harmless. Cap the length. */
 function trimMessage(message: string, url: string): string {
   let m = (message.split(/\r?\n/, 1)[0] ?? "").replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, "[url]");
   const u = new URL(url);
-  const segments = u.pathname.split("/").filter((p) => p.length >= 16);
-  for (const secret of [url, u.host + u.pathname, ...u.searchParams.values(), ...segments]) {
+  const segments = u.pathname.split("/").filter((p) => p.length >= 8);
+  const secrets = new Set<string>();
+  for (const s of [url, u.host + u.pathname, ...u.searchParams.values(), u.username, u.password, ...segments]) {
+    if (!s) continue;
+    secrets.add(s);
+    secrets.add(encodeURIComponent(s));
+    try {
+      secrets.add(decodeURIComponent(s));
+    } catch {}
+  }
+  for (const secret of [...secrets].sort((a, b) => b.length - a.length)) {
     if (secret) m = m.split(secret).join("[url]");
   }
   return m.slice(0, 300);

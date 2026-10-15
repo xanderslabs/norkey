@@ -64,7 +64,7 @@ async function proxyRpc(url: string, method: string, params: unknown[]): Promise
     const message = (error as { message?: unknown }).message;
     throw new ProviderRpcError(
       -32603,
-      `The paymaster refused: ${typeof message === "string" ? message : "no reason given"}`,
+      `The paymaster or bundler refused: ${typeof message === "string" ? message : "no reason given"}`,
     );
   }
   if (!res.ok || !body) throw new ProviderRpcError(-32603, `The paymaster proxy answered ${res.status}.`);
