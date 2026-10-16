@@ -6,12 +6,13 @@ import {
   type PreparedCalls,
   type PreparedUserOp,
 } from "@norkey/client/protocol";
+import type { Address } from "viem";
 import { createApi } from "./api.js";
 import { RequestError, validateCalls, validateUserOp } from "./calls.js";
 import { acceptRequest, announceReady, reply } from "./channel.js";
 import { type PageConfig, readConfig } from "./config.js";
-import { connectCreate, connectExisting, explain, signCalls, signUserOperation } from "./flows.js";
-import { showBusy, showConnect, showConsent, showError, showWaiting } from "./view.js";
+import { addPasskey, connectCreate, connectExisting, explain, signCalls, signUserOperation } from "./flows.js";
+import { showBackupOffer, showBusy, showConnect, showConsent, showError, showMessage, showWaiting } from "./view.js";
 
 const config = readConfig();
 const api = createApi(config.apiUrl);
@@ -42,6 +43,33 @@ const reject = (id: string) => () =>
 const caliburFor = (chainId: number) =>
   (config.chains.find((c) => c.id === chainId) as PageConfig["chains"][number]).calibur;
 
+/** Slice 4: after a new wallet is stored, offer a backup passkey. Resolves when the user is done, and
+ *  the popup then replies with the address. An error here is shown, never thrown: the wallet exists. */
+function offerBackup(address: Address): Promise<void> {
+  return new Promise((done) => {
+    const offer = () =>
+      showBackupOffer({
+        add: async () => {
+          showBusy(
+            "Follow your browser's prompts: create the backup passkey, confirm it, then unlock with the passkey you just made.",
+          );
+          try {
+            await addPasskey(api, config.rpId, address);
+            showMessage("Backup added", "Added. Test it: sign in with the new passkey on the settings page.", [
+              ["Continue", done],
+            ]);
+          } catch (e) {
+            const message = explain(e);
+            if (message === null) offer();
+            else showMessage("Backup not added", message, [["Continue", done]], true);
+          }
+        },
+        skip: done,
+      });
+    offer();
+  });
+}
+
 function handle(req: PopupRequest, origin: string): void {
   if (req.kind === "connect") {
     const run = (flow: () => Promise<{ address: `0x${string}` }>) => async () => {
@@ -54,7 +82,11 @@ function handle(req: PopupRequest, origin: string): void {
       }
     };
     showConnect(origin, {
-      create: run(() => connectCreate(api, req.label)),
+      create: run(async () => {
+        const created = await connectCreate(api, req.label);
+        await offerBackup(created.address);
+        return created;
+      }),
       existing: run(() => connectExisting(api)),
       cancel: reject(req.id),
     });

@@ -51,6 +51,8 @@ try {
   // 1. Create a wallet.
   await page.click("#connect");
   await wallet().getByText("Create a new wallet").click();
+  // Slice 4: the backup offer comes before the popup replies. Skipped here; step 9 adds a passkey.
+  await wallet().getByRole("button", { name: "Skip" }).click();
   await page.waitForFunction(() => document.getElementById("address")?.textContent?.startsWith("0x"), null, {
     timeout: 30000,
   });

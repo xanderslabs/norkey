@@ -63,6 +63,19 @@ export function showSettings(address: string, actions: { add: () => void }) {
   screen(el("h1", "Your wallet"), details, el("p", LOSS_RULE), button("Add a passkey", actions.add, true));
 }
 
+export function showBackupOffer(actions: { add: () => void; skip: () => void }) {
+  screen(
+    el("h1", "Add a backup passkey"),
+    el(
+      "p",
+      "Your wallet is ready. A second passkey opens it if you lose this one. It can be in another passkey provider, in another device's provider, or on a hardware security key.",
+    ),
+    el("p", LOSS_RULE),
+    button("Add a backup passkey", actions.add, true),
+    button("Skip", actions.skip),
+  );
+}
+
 export function showConnect(origin: string, actions: { create: () => void; existing: () => void; cancel: () => void }) {
   screen(
     el("h1", "Connect a wallet"),

@@ -84,6 +84,8 @@ try {
   // 1. Create a wallet and give it 0.001 ETH, for the values it sends. Gas is the paymaster's.
   await page.click("#connect");
   await wallet().getByText("Create a new wallet").click();
+  // Slice 4: the backup offer comes before the popup replies.
+  await wallet().getByRole("button", { name: "Skip" }).click();
   await page.waitForFunction(() => document.getElementById("address")?.textContent?.startsWith("0x"), null, {
     timeout: 30000,
   });
