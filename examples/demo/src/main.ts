@@ -42,6 +42,8 @@ const reader = (): PublicClient => {
 };
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
+// The boundary page opened with no opener is the settings page: add a passkey, export the key.
+($("settings") as HTMLAnchorElement).href = vaultOrigin;
 const log = (line: string) => {
   $("log").textContent += `${line}\n`;
 };

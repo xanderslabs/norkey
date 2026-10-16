@@ -101,7 +101,7 @@ export function createHarness() {
     const page = await ctx.newPage();
     const cdp = await ctx.newCDPSession(page);
     await cdp.send("WebAuthn.enable");
-    await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
       options: {
         protocol: "ctap2",
         ctap2Version: "ctap2_1",
@@ -124,6 +124,8 @@ export function createHarness() {
     await page.goto("http://localhost:5173/");
     return {
       page,
+      cdp,
+      authenticatorId,
       wallet: () => page.frameLocator("iframe").last(),
       logText: () => page.locator("#log").textContent(),
     };

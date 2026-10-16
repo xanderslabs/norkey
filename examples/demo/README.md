@@ -48,6 +48,25 @@ asks for a passkey again. The demo sets `apiUrl` from `VITE_API` (default
 `apiUrl` on the same site as the app: the session cookie is `SameSite=Lax`, so a cross-site
 `apiUrl` would not carry it.
 
+## Wallet settings
+
+**Wallet settings** opens the boundary page in a new tab. Opened with no opener, the boundary page
+is the settings page. The user signs in with a passkey, then can:
+
+- **Add a passkey**: one more passkey that opens the same wallet. It can be in another passkey
+  provider, in another device's provider, or on a hardware security key that supports PRF. The
+  browser asks three times: create the new passkey, confirm it, then unlock with a passkey the
+  wallet already has. Then sign in with the new passkey on the settings page to test it.
+- **Export wallet key**: the private key as hex and as a QR code, after three warnings, a checkbox
+  and one passkey prompt. Anyone with the key controls the wallet, and it cannot be revoked. The
+  page wipes it when you leave the screen, click **Hide**, or after 60 seconds.
+
+A new wallet also gets an offer to add a backup passkey before the popup closes. **Skip** leaves it
+for the settings page. A user who loses every passkey and never exported the key loses the wallet.
+
+Link to the settings page with `rel="noopener"`. A boundary page that has an opener waits for an
+app request instead.
+
 ## End-to-end journey
 
 ```sh
@@ -56,7 +75,8 @@ pnpm build && pnpm --filter demo e2e
 
 The journey starts Anvil (a Sepolia fork), the server, the boundary page, and the app, then drives Chrome with a
 virtual authenticator. It needs `anvil` on your PATH and network access to fork Sepolia. Read the header of
-`e2e/journey.mjs` for why it swaps the popup for an iframe.
+`e2e/journey.mjs` for why it swaps the popup for an iframe. Its last steps add a second virtual
+authenticator, a USB security key, on the settings page, send with it, and export the key.
 
 ```sh
 pnpm build && pnpm --filter demo e2e:sponsored

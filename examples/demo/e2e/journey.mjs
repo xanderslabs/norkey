@@ -1,5 +1,6 @@
 // Slice 1 journey: create a wallet, check the server holds only ciphertext, fund it on a Sepolia
-// fork, send ETH with a passkey approval, then reconnect with the existing passkey.
+// fork, send ETH with a passkey approval, then reconnect with the existing passkey. Slice 4 (steps 9
+// to 11): add a second passkey on the settings page, send with it, and export the key.
 //
 // Why it matters: this is the only test that runs the real flow end to end (server WebAuthn
 // verification, PRF, wrap, boundary page under its CSP, provider, signing, broadcast). Low unit
@@ -12,6 +13,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { privateKeyToAccount } from "viem/accounts";
 import { createHarness, DESIGNATOR, latestTx, rpcAt, waitFor } from "./harness.mjs";
 
 const h = createHarness();
@@ -46,7 +48,7 @@ try {
     waitFor("http://localhost:5174/"),
     waitFor("http://localhost:5173/"),
   ]);
-  const { page, wallet, logText } = await h.openApp();
+  const { page, cdp, authenticatorId: firstAuthenticator, wallet, logText } = await h.openApp();
 
   // 1. Create a wallet.
   await page.click("#connect");
@@ -152,6 +154,108 @@ try {
   await page.waitForFunction(() => document.getElementById("log")?.textContent?.includes("popup was blocked"));
   assert.match(await logText(), /error 4001/);
   console.log("8. blocked popup: 4001");
+
+  // 9. Add a second passkey on the settings page, on a second virtual authenticator: a USB security
+  // key with PRF, so its assertions say "cross-platform" (slice 4, decision 6). Test-only: two
+  // authenticators would both answer a prompt. Before each prompt on the boundary page, the hook
+  // leaves user presence on only for the authenticator that holds an allowed credential, or for
+  // `active` when the prompt allows any.
+  const { authenticatorId: secondAuthenticator } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: {
+      protocol: "ctap2",
+      ctap2Version: "ctap2_1",
+      transport: "usb",
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      hasPrf: true,
+    },
+  });
+  const authenticators = [firstAuthenticator, secondAuthenticator];
+  const credentialsOf = async (authenticatorId) =>
+    (await cdp.send("WebAuthn.getCredentials", { authenticatorId })).credentials.map((c) =>
+      c.credentialId.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+    );
+  let active = firstAuthenticator;
+  await page.exposeBinding("__e2ePasskey", async (_source, allowed) => {
+    let use = active;
+    for (const id of authenticators) if ((await credentialsOf(id)).some((c) => allowed.includes(c))) use = id;
+    for (const id of authenticators) {
+      await cdp.send("WebAuthn.setAutomaticPresenceSimulation", { authenticatorId: id, enabled: id === use });
+    }
+  });
+  await page.addInitScript(() => {
+    if (location.port !== "5174") return;
+    const b64url = (buffer) =>
+      btoa(String.fromCharCode(...new Uint8Array(buffer)))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+    const container = navigator.credentials;
+    for (const kind of ["create", "get"]) {
+      const original = container[kind].bind(container);
+      container[kind] = async (options) => {
+        await window.__e2ePasskey((options.publicKey.allowCredentials ?? []).map((d) => b64url(d.id)));
+        return original(options);
+      };
+    }
+  });
+  // The demo's Wallet settings link, followed in this tab: the virtual authenticators belong to it.
+  const settingsLink = page.locator("#settings");
+  assert.equal(await settingsLink.getAttribute("rel"), "noopener");
+  await page.goto(await settingsLink.getAttribute("href"));
+  await page.getByRole("button", { name: "Sign in with your passkey" }).click();
+  await page.getByRole("heading", { name: "Your wallet" }).waitFor();
+  assert.equal((await page.locator(".row .value").textContent()).toLowerCase(), address.toLowerCase());
+  active = secondAuthenticator;
+  await page.getByRole("button", { name: "Add a passkey" }).click();
+  await page.getByText("Added. Test it").waitFor({ timeout: 30000 });
+  const [secondCredential] = await credentialsOf(secondAuthenticator);
+  const sql9 = new DatabaseSync(db);
+  const credentials = sql9.prepare("SELECT credential_id, user_id FROM credentials").all();
+  const wrapRows = sql9.prepare("SELECT credential_id, user_id FROM wraps").all();
+  sql9.close();
+  assert.equal(credentials.length, 2);
+  assert.equal(new Set([...credentials, ...wrapRows].map((r) => r.user_id)).size, 1, "one user");
+  assert.deepEqual(
+    wrapRows.map((w) => w.credential_id).sort(),
+    credentials.map((c) => c.credential_id).sort(),
+  );
+  assert.ok(credentials.some((c) => c.credential_id === secondCredential));
+  console.log("9. settings page: added a passkey on a USB authenticator; 2 credentials and 2 wraps, one user");
+
+  // 10. Send from the app with the second passkey. Forgetting the remembered passkey makes the popup's
+  // prompt allow any passkey, and only the second authenticator has presence.
+  await page.evaluate(() => localStorage.removeItem("norkey:credential"));
+  await page.goto("http://localhost:5173/");
+  await page.waitForFunction(() => document.getElementById("address")?.textContent?.startsWith("0x"));
+  const beforeSecond = await bal(to);
+  await page.fill("#to", to);
+  await page.fill("#amount", "0.0001");
+  await page.click("#send");
+  await wallet().getByText("Approve with passkey").click();
+  await page.waitForFunction(() => document.getElementById("log")?.textContent?.includes("confirmed"), null, {
+    timeout: 60000,
+  });
+  assert.equal((await bal(to)) - beforeSecond, 100000000000000n);
+  const vaultFrame = page.frames().find((f) => f.url().startsWith("http://localhost:5174"));
+  assert.equal(await vaultFrame.evaluate(() => localStorage.getItem("norkey:credential")), secondCredential);
+  console.log("10. sent 0.0001 ETH with the second passkey (cross-platform, with PRF)");
+
+  // 11. Export on the settings page, signed in with the second passkey: the key's address is the
+  // wallet's, and Hide wipes it.
+  await page.goto("http://localhost:5174/");
+  await page.getByRole("button", { name: "Sign in with your passkey" }).click();
+  await page.getByRole("button", { name: "Export wallet key" }).click();
+  await page.getByLabel("I understand").check();
+  await page.getByRole("button", { name: "Show my key (passkey)" }).click();
+  await page.locator(".qr canvas").waitFor();
+  const exported = await page.locator("code.key").textContent();
+  assert.match(exported, /^0x[0-9a-f]{64}$/);
+  assert.equal(privateKeyToAccount(exported).address.toLowerCase(), address.toLowerCase());
+  await page.getByRole("button", { name: "Hide" }).click();
+  assert.equal(await page.locator("code.key").textContent(), "");
+  console.log("11. exported on the settings page: the key's address is the wallet's; Hide wiped it");
   console.log("JOURNEY PASS");
 } catch (e) {
   await h.report(e);
