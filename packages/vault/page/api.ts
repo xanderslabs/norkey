@@ -49,6 +49,10 @@ export function createApi(apiUrl: string) {
     loginVerify: (challengeId: string, response: AuthenticationResponseJSON) =>
       call<LoginResult>("/login/verify", { challengeId, response }),
     createWallet: (address: Address, wrap: Wrap) => call<{ address: Address }>("/wallet", { address, wrap }),
+    passkeyOptions: () =>
+      call<{ challengeId: string; options: PublicKeyCredentialCreationOptionsJSON }>("/passkeys/options", {}),
+    addPasskey: (challengeId: string, response: RegistrationResponseJSON, wrap: Wrap) =>
+      call<{ credentialId: string }>("/passkeys", { challengeId, response, wrap }),
   };
 }
 export type Api = ReturnType<typeof createApi>;

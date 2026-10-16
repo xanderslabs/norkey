@@ -44,6 +44,25 @@ export function showError(message: string): void {
   screen(el("h1", "Something went wrong"), el("p", message, "error"));
 }
 
+/** A title, a message and buttons; the first button is the primary one. */
+export function showMessage(title: string, message: string, actions: [string, () => void][] = [], error = false) {
+  screen(
+    el("h1", title),
+    el("p", message, error ? "error" : undefined),
+    ...actions.map(([label, onClick], i) => button(label, onClick, i === 0)),
+  );
+}
+
+/** The rule every backup screen states (slice 4). */
+const LOSS_RULE =
+  "Each passkey you add can open this wallet. If you lose every passkey and never exported your key, the wallet is lost.";
+
+export function showSettings(address: string, actions: { add: () => void }) {
+  const details = el("div", undefined, "details");
+  details.append(row("Address", address));
+  screen(el("h1", "Your wallet"), details, el("p", LOSS_RULE), button("Add a passkey", actions.add, true));
+}
+
 export function showConnect(origin: string, actions: { create: () => void; existing: () => void; cancel: () => void }) {
   screen(
     el("h1", "Connect a wallet"),

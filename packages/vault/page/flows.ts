@@ -1,9 +1,10 @@
 import type { PreparedCalls, PreparedUserOp } from "@norkey/client/protocol";
 import type { Address, Hex } from "viem";
-import type { Api } from "./api.js";
-import { signPreparedCalls, signUserOp } from "./calls.js";
-import { createPasskey, getPasskey } from "./passkey.js";
-import { addressOf, generateWalletKey, unwrapKey, wrapKey } from "./wrap.js";
+import { type Api, ApiError } from "./api.js";
+import { RequestError, signPreparedCalls, signUserOp } from "./calls.js";
+import { bytesToBase64Url } from "./encoding.js";
+import { CancelledError, createPasskey, getPasskey, NoPrfError, PasskeyError } from "./passkey.js";
+import { addressOf, generateWalletKey, unwrapKey, WrapError, wrapKey } from "./wrap.js";
 
 export class FlowError extends Error {
   constructor(message: string) {
@@ -94,12 +95,19 @@ export async function connectExisting(api: Api): Promise<{ address: Address }> {
   }
 }
 
-/** One passkey gesture: unwrap K, check it opens `from`, run `use`, then zero K and the PRF output. */
-async function withUnlockedKey<T>(api: Api, from: string, use: (key: Uint8Array) => Promise<T>): Promise<T> {
+/** One passkey gesture: unwrap K, check it opens `from`, run `use`, then zero K and the PRF output.
+ *  `refuse` names a passkey that has no wrap yet (add-a-passkey's new one). `local` as in getPasskey. */
+export async function withUnlockedKey<T>(
+  api: Api,
+  from: string,
+  use: (key: Uint8Array, userId: string) => Promise<T>,
+  opts: { refuse?: string; local?: boolean } = {},
+): Promise<T> {
   const lo = await api.loginOptions(recalledCredential());
-  const got = await getPasskey(lo.options);
+  const got = await getPasskey(lo.options, opts.local);
   let key: Uint8Array | undefined;
   try {
+    if (got.response.id === opts.refuse) throw new FlowError("Use the passkey you already had for this step.");
     const res = await api.loginVerify(lo.challengeId, got.response);
     if (!res.wallet || !res.wrap) throw new FlowError("This passkey cannot sign for this wallet.");
     if (res.wallet.address.toLowerCase() !== from.toLowerCase()) {
@@ -111,13 +119,95 @@ async function withUnlockedKey<T>(api: Api, from: string, use: (key: Uint8Array)
       userId: res.userId,
       address: res.wallet.address,
     });
-    const result = await use(key);
+    const result = await use(key, res.userId);
     rememberCredential(got.response.id);
     return result;
   } finally {
     key?.fill(0);
     new Uint8Array(got.prfOutput).fill(0);
   }
+}
+
+/** A sign-in with no unwrap: the PRF output is zeroed at once. Issues a fresh session and returns the
+ *  user's wallet address, or null when the user has no wallet. */
+export async function signIn(api: Api, credentialId?: string, local = true): Promise<Address | null> {
+  const lo = await api.loginOptions(credentialId);
+  const got = await getPasskey(lo.options, local);
+  try {
+    const res = await api.loginVerify(lo.challengeId, got.response);
+    if (!res.wallet) return null;
+    rememberCredential(got.response.id);
+    return res.wallet.address;
+  } finally {
+    new Uint8Array(got.prfOutput).fill(0);
+  }
+}
+
+/** Creation options for one more passkey. The server needs a session from the last 5 minutes
+ *  (decision 5). After a 401 the user signs in once more and the request is repeated. */
+async function freshPasskeyOptions(api: Api) {
+  try {
+    return await api.passkeyOptions();
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 401) throw e;
+    await signIn(api, recalledCredential(), false);
+    return api.passkeyOptions();
+  }
+}
+
+/**
+ * Slice 4: wrap the same K under one more passkey. The new passkey is created and read first, and K
+ * exists only inside the last gesture, which unlocks it with a passkey the wallet already has
+ * (decision 3). The new wrap uses PRF output from a `get` on the new passkey, never the value at
+ * create (decision 2). No prompt passes hints, so another provider or a hardware key can answer.
+ */
+export async function addPasskey(api: Api, rpId: string, address: Address): Promise<void> {
+  const { challengeId, options } = await freshPasskeyOptions(api);
+  const created = await createPasskey(options);
+  if (created.prfOutput) new Uint8Array(created.prfOutput).fill(0);
+  const credentialId = created.response.id;
+  let prf: ArrayBuffer | undefined;
+  try {
+    // A local challenge: this read only evaluates PRF, so nothing is sent to the server.
+    const read = await getPasskey(
+      {
+        challenge: bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32))),
+        rpId,
+        allowCredentials: [{ id: credentialId, type: "public-key", transports: created.response.response.transports }],
+        userVerification: "required",
+      },
+      false,
+    );
+    prf = read.prfOutput;
+    const prfOutput = prf;
+    const wrap = await withUnlockedKey(
+      api,
+      address,
+      (key, userId) => wrapKey({ key, prfOutput, credentialId, userId, address }),
+      { refuse: credentialId, local: false },
+    );
+    await api.addPasskey(challengeId, created.response, wrap);
+  } finally {
+    if (prf) new Uint8Array(prf).fill(0);
+  }
+}
+
+/** The message to show for a flow error, or null when the user cancelled. */
+export function explain(e: unknown): string | null {
+  if ((e instanceof DOMException && e.name === "NotAllowedError") || e instanceof CancelledError) return null;
+  // excludeCredentials: this provider already holds a passkey for the wallet.
+  if (e instanceof DOMException && e.name === "InvalidStateError") {
+    return "This passkey provider already has a passkey for this wallet. Choose another provider or a security key.";
+  }
+  const known =
+    e instanceof NoPrfError ||
+    e instanceof PasskeyError ||
+    e instanceof FlowError ||
+    e instanceof WrapError ||
+    e instanceof ApiError ||
+    e instanceof RequestError;
+  if (!known) console.error("norkey:", e);
+  return known ? (e as Error).message : "Unexpected error.";
 }
 
 export async function signCalls(api: Api, p: PreparedCalls, calibur: Address): Promise<{ raw: Hex }> {

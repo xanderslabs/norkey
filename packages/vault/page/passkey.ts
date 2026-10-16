@@ -109,9 +109,12 @@ export async function createPasskey(
   return { response: registrationJSON(credential), prfOutput: readPrf(credential) };
 }
 
-/** Run a passkey assertion from server options and evaluate PRF in the same gesture. */
+/** Run a passkey assertion from server options and evaluate PRF in the same gesture. `local` asks the
+ *  browser for a passkey on this device, for app requests. The settings page and add-a-passkey pass
+ *  false, so another device's provider or a hardware key can answer. */
 export async function getPasskey(
   options: PublicKeyCredentialRequestOptionsJSON,
+  local = true,
 ): Promise<{ response: AuthenticationResponseJSON; prfOutput: ArrayBuffer }> {
   const assertion = (await navigator.credentials.get({
     publicKey: {
@@ -120,13 +123,17 @@ export async function getPasskey(
       timeout: options.timeout,
       allowCredentials: options.allowCredentials?.map(descriptor),
       userVerification: options.userVerification ?? "required",
-      hints: LOCAL_HINTS,
+      ...(local ? { hints: LOCAL_HINTS } : {}),
       extensions: prfExtension,
     } as PublicKeyCredentialRequestOptions,
   })) as PublicKeyCredential | null;
   if (!assertion) throw new CancelledError();
-  if (assertion.authenticatorAttachment === "cross-platform") throw new PasskeyError(CROSS_DEVICE_REJECTED);
   const prfOutput = readPrf(assertion);
-  if (!prfOutput) throw new NoPrfError();
+  if (!prfOutput) {
+    if (assertion.authenticatorAttachment === "cross-platform") throw new PasskeyError(CROSS_DEVICE_REJECTED);
+    throw new NoPrfError();
+  }
+  // Slice 4, decision 6: a passkey from another device or a hardware key goes on when it returns PRF
+  // output. The wrap's AES-GCM check then decides whether it opens the wallet.
   return { response: authenticationJSON(assertion), prfOutput };
 }
