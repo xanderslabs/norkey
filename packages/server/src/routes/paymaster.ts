@@ -67,7 +67,7 @@ export async function proxyPaymaster(
  *  lines. Keep the first line, replace every URL of any scheme, then the configured URL's host name, host and path
  *  (no scheme), its raw query text (each part, its name and its value, so a raw "+" or a bare name is
  *  caught), its query values, its user name and password, and any path segment long enough to be a
- *  key, each also percent-encoded and decoded. Longest first, so a shorter secret cannot break a longer
+ *  key, each also percent-encoded, decoded, and form-decoded ("+" as a space). Longest first, so a shorter secret cannot break a longer
  *  one. Short values may be over-redacted; that is harmless. Cap the length. */
 function trimMessage(message: string, url: string): string {
   let m = (message.split(/\r?\n/, 1)[0] ?? "").replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, "[url]");
@@ -96,6 +96,9 @@ function trimMessage(message: string, url: string): string {
     secrets.add(encodeURIComponent(s));
     try {
       secrets.add(decodeURIComponent(s));
+    } catch {}
+    try {
+      secrets.add(decodeURIComponent(s.replace(/\+/g, " ")));
     } catch {}
   }
   for (const secret of [...secrets].sort((a, b) => b.length - a.length)) {

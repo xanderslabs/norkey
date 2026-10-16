@@ -205,7 +205,7 @@ describe("paymaster proxy", () => {
 
     // The key can also sit in the URL's user name or password, appear percent-encoded or decoded, or be
     // a path segment shorter than 16 characters. It can also hold a raw "+" in a query value, or sit in
-    // the query as a bare name with no "=".
+    // the query as a bare name with no "=", which a vendor can echo form-decoded ("+" as a space).
     const cases = [
       {
         url: "https://keyuser:keypass99@bundler.example/rpc",
@@ -231,6 +231,11 @@ describe("paymaster proxy", () => {
         url: "https://bundler.example/rpc?SECRETKEY1234",
         message: "bad request SECRETKEY1234",
         secrets: ["SECRETKEY1234"],
+      },
+      {
+        url: "https://bundler.example/rpc?SECRET+KEY12",
+        message: "bad request SECRET KEY12",
+        secrets: ["SECRET KEY12"],
       },
     ];
     const leaks: string[] = [];
