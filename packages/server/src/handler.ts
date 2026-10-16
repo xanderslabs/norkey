@@ -51,7 +51,11 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
     if (req.method === "POST") {
       try {
         const text = await req.text();
-        body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+        const parsed: unknown = text ? JSON.parse(text) : {};
+        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+          return json(400, { error: "invalid JSON" });
+        }
+        body = parsed as Record<string, unknown>;
       } catch {
         return json(400, { error: "invalid JSON" });
       }
@@ -71,7 +75,7 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
       }
       switch (route) {
         case "POST /register/options":
-          return json(200, await registerOptions(config, body?.label));
+          return json(200, await registerOptions(config, body.label));
         case "POST /register/verify": {
           const userId = await registerVerify(config, String(body.challengeId), body.response as never);
           return json(200, { userId }, { "set-cookie": await issueSession(config, userId) });
