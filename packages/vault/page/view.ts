@@ -4,7 +4,7 @@ import { chainName, describeCall } from "./decode.js";
 
 const root = () => document.getElementById("app") as HTMLElement;
 
-function el<K extends keyof HTMLElementTagNameMap>(
+export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   text?: string,
   className?: string,
@@ -15,14 +15,14 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function button(label: string, onClick: () => void, primary = false): HTMLButtonElement {
+export function button(label: string, onClick: () => void, primary = false): HTMLButtonElement {
   const b = el("button", label, primary ? "primary" : "secondary");
   b.type = "button";
   b.addEventListener("click", onClick);
   return b;
 }
 
-function screen(...children: Node[]): void {
+export function screen(...children: Node[]): void {
   root().replaceChildren(...children);
 }
 
@@ -57,10 +57,16 @@ export function showMessage(title: string, message: string, actions: [string, ()
 const LOSS_RULE =
   "Each passkey you add can open this wallet. If you lose every passkey and never exported your key, the wallet is lost.";
 
-export function showSettings(address: string, actions: { add: () => void }) {
+export function showSettings(address: string, actions: { add: () => void; exportKey: () => void }) {
   const details = el("div", undefined, "details");
   details.append(row("Address", address));
-  screen(el("h1", "Your wallet"), details, el("p", LOSS_RULE), button("Add a passkey", actions.add, true));
+  screen(
+    el("h1", "Your wallet"),
+    details,
+    el("p", LOSS_RULE),
+    button("Add a passkey", actions.add, true),
+    button("Export wallet key", actions.exportKey),
+  );
 }
 
 export function showBackupOffer(actions: { add: () => void; skip: () => void }) {

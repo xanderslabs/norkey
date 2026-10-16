@@ -23,6 +23,20 @@ describe("boundary guardrails", () => {
     }
   });
 
+  it("export is reachable only from the settings page", () => {
+    // Why: export hands out K itself, and it cannot be revoked. The settings page is a direct visit
+    // with no app behind it. If the popup's request handler or channel.ts could reach the export
+    // flow, a request from the app page (or XSS on it) could open the export screen in the popup.
+    const importsOf = (f: string) => [...src(f).matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]);
+    const importers = (target: string) => files.filter((f) => importsOf(f).includes(target));
+    expect(importers("./export.js")).toEqual(["settings.ts"]);
+    expect(importers("./settings.js")).toEqual(["main.ts"]);
+    for (const f of ["channel.ts", "requests.ts"]) {
+      expect(importsOf(f), f).not.toContain("./export.js");
+      expect(importsOf(f), f).not.toContain("./settings.js");
+    }
+  });
+
   it("api.ts sends no PRF output or key fields", () => {
     expect(src("api.ts")).not.toMatch(/prfOutput|walletKey|\bkek\b/i);
   });

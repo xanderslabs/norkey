@@ -1,9 +1,11 @@
 // The settings page: a direct visit to the boundary page, with no app behind it. A user signs in here
-// to add a passkey (slice 4). Every passkey prompt here passes no hints, so another device's provider
-// or a hardware key can answer.
+// to add a passkey or export the wallet key (slice 4). It is the only module that imports export.ts
+// (guardrail test). Every passkey prompt here passes no hints, so another device's provider or a
+// hardware key can answer.
 import type { Address } from "viem";
 import { createApi } from "./api.js";
 import { readConfig } from "./config.js";
+import { showExport } from "./export.js";
 import { addPasskey, explain, signIn } from "./flows.js";
 import { showBusy, showMessage, showSettings } from "./view.js";
 
@@ -50,6 +52,7 @@ function signedIn(address: Address): void {
         failed(e, () => signedIn(address));
       }
     },
+    exportKey: () => showExport(api, address, () => signedIn(address)),
   });
 }
 
