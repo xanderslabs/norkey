@@ -4,7 +4,7 @@ import { type StoredWrap, WalletExistsError } from "../storage/types.js";
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const WRAP_FIELDS = ["id", "credentialId", "salt", "iv", "ciphertext"] as const;
 
-function isWrap(w: unknown): w is StoredWrap {
+export function isWrap(w: unknown): w is StoredWrap {
   if (typeof w !== "object" || w === null) return false;
   const r = w as Record<string, unknown>;
   return r.kind === "passkey" && WRAP_FIELDS.every((f) => typeof r[f] === "string" && (r[f] as string).length > 0);

@@ -68,6 +68,27 @@ export function sqlite(path: string): NorKeyStorage {
         transports: JSON.parse(r.transports as string) as string[],
       } satisfies StoredCredential;
     },
+    async listCredentialIds(userId) {
+      const rows = db
+        .prepare("SELECT credential_id FROM credentials WHERE user_id = ? ORDER BY rowid")
+        .all(userId) as Row[];
+      return rows.map((r) => r.credential_id as string);
+    },
+    async addCredentialWithWrap(c, wrap) {
+      db.exec("BEGIN");
+      try {
+        db.prepare(
+          "INSERT INTO credentials (credential_id, user_id, public_key, sign_count, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        ).run(c.credentialId, c.userId, c.publicKey, c.signCount, JSON.stringify(c.transports), Date.now());
+        db.prepare(
+          "INSERT INTO wraps (id, user_id, kind, credential_id, salt, iv, ciphertext, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ).run(wrap.id, c.userId, wrap.kind, wrap.credentialId, wrap.salt, wrap.iv, wrap.ciphertext, Date.now());
+        db.exec("COMMIT");
+      } catch (e) {
+        db.exec("ROLLBACK");
+        throw e;
+      }
+    },
     async setSignCount(credentialId, signCount) {
       db.prepare("UPDATE credentials SET sign_count = ? WHERE credential_id = ?").run(signCount, credentialId);
     },
@@ -99,6 +120,13 @@ export function sqlite(path: string): NorKeyStorage {
         | undefined;
       if (!r || Number(r.expires_at) < Date.now()) return null;
       return r.user_id as string;
+    },
+    async getSession(tokenHash) {
+      const r = db.prepare("SELECT user_id, expires_at FROM sessions WHERE token_hash = ?").get(tokenHash) as
+        | Row
+        | undefined;
+      if (!r || Number(r.expires_at) < Date.now()) return null;
+      return { userId: r.user_id as string, expiresAt: Number(r.expires_at) };
     },
     async deleteSession(tokenHash) {
       db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(tokenHash);

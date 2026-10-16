@@ -1,6 +1,14 @@
-import { AuthError, loginOptions, loginVerify, registerOptions, registerVerify } from "./auth/passkey.js";
-import { endSession, issueSession, readSession } from "./auth/session.js";
+import {
+  AuthError,
+  addPasskeyOptions,
+  loginOptions,
+  loginVerify,
+  registerOptions,
+  registerVerify,
+} from "./auth/passkey.js";
+import { endSession, issueSession, readFreshSession, readSession } from "./auth/session.js";
 import { type NorKeyHandlerConfig, resolveConfig } from "./config.js";
+import { addPasskey } from "./routes/passkeys.js";
 import { proxyPaymaster } from "./routes/paymaster.js";
 import { createWallet } from "./routes/wallet.js";
 
@@ -95,6 +103,19 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
           const userId = await readSession(config, req);
           if (!userId) return json(401, { error: "not signed in" });
           const r = await createWallet(config, userId, body);
+          return json(r.status, r.body);
+        }
+        case "POST /passkeys/options": {
+          // Slice 4, decision 5: a session issued in the last 5 minutes, so an old cookie cannot add one.
+          const userId = await readFreshSession(config, req);
+          if (!userId) return json(401, { error: "sign in again to add a passkey" });
+          if (!(await config.storage.getWallet(userId))) return json(409, { error: "no wallet" });
+          return json(200, await addPasskeyOptions(config, userId));
+        }
+        case "POST /passkeys": {
+          const userId = await readFreshSession(config, req);
+          if (!userId) return json(401, { error: "sign in again to add a passkey" });
+          const r = await addPasskey(config, userId, body);
           return json(r.status, r.body);
         }
         case "POST /logout":

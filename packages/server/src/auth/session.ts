@@ -2,6 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import type { ResolvedConfig } from "../config.js";
 
 const COOKIE = "norkey_session";
+/** Slice 4, decision 5: adding a passkey needs a session issued in the last 5 minutes. */
+const FRESH_MS = 5 * 60 * 1000;
 const hash = (token: Uint8Array) => createHash("sha256").update(token).digest("hex");
 
 /** One place builds the cookie, so logout's expiring copy has the same Path, Domain and Secure as the
@@ -33,6 +35,17 @@ function readToken(req: Request): Buffer | null {
 export async function readSession(config: ResolvedConfig, req: Request): Promise<string | null> {
   const token = readToken(req);
   return token ? config.storage.getSessionUser(hash(token)) : null;
+}
+
+/** The session's user if the session was issued in the last 5 minutes, else null. Storage keeps only
+ *  the expiry, so the issue time is the expiry minus the configured lifetime. A lifetime lowered after
+ *  issue makes an old session look newer; an issue time in the future is refused. */
+export async function readFreshSession(config: ResolvedConfig, req: Request): Promise<string | null> {
+  const token = readToken(req);
+  const session = token ? await config.storage.getSession(hash(token)) : null;
+  if (!session) return null;
+  const age = Date.now() - (session.expiresAt - config.sessionTtlSeconds * 1000);
+  return age >= 0 && age <= FRESH_MS ? session.userId : null;
 }
 
 /** Deletes the request's session, if it has one, and returns a Set-Cookie value that expires the cookie. */
