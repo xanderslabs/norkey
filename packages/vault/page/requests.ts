@@ -61,7 +61,16 @@ function offerBackup(address: Address): Promise<void> {
           } catch (e) {
             const message = explain(e);
             if (message === null) offer();
-            else showMessage("Backup not added", message, [["Continue", done]], true);
+            else
+              showMessage(
+                "Backup not added",
+                message,
+                [
+                  ["Try again", offer],
+                  ["Continue", done],
+                ],
+                true,
+              );
           }
         },
         skip: done,
