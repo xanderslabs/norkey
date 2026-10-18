@@ -79,8 +79,9 @@ export function showExport(api: Api, address: Address, back: () => void): void {
       wipe(explain(e) ?? "");
       return;
     }
-    // The user went Back while the passkey prompt was open: keep nothing.
-    if (left) {
+    // The user went Back, or the tab was hidden, while the passkey prompt was open: keep nothing. On
+    // return the user shows the key again.
+    if (left || document.visibilityState === "hidden") {
       hex = "";
       return;
     }
