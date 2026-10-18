@@ -20,6 +20,7 @@ export function showExport(api: Api, address: Address, back: () => void): void {
   let hex = "";
   let idle: ReturnType<typeof setTimeout> | undefined;
   let left = false;
+  let pending = false;
 
   const warnings = el("ul");
   for (const w of WARNINGS) warnings.append(el("li", w));
@@ -60,10 +61,17 @@ export function showExport(api: Api, address: Address, back: () => void): void {
   }
 
   const onHidden = () => {
-    if (document.visibilityState === "hidden") wipe();
+    // Say why only when a key was shown or on its way: a tab switch on the warnings hid nothing.
+    if (document.visibilityState === "hidden") {
+      wipe(hex || pending ? "Hidden. Showing the key again needs your passkey." : "");
+    }
   };
 
   async function show(): Promise<void> {
+    // One passkey prompt at a time: after a hidden-tab wipe the user can tick the box again while the
+    // first prompt is still open.
+    if (pending) return;
+    pending = true;
     reveal.disabled = true;
     status.textContent = "Confirm with your passkey...";
     try {
@@ -78,6 +86,8 @@ export function showExport(api: Api, address: Address, back: () => void): void {
     } catch (e) {
       wipe(explain(e) ?? "");
       return;
+    } finally {
+      pending = false;
     }
     // The user went Back, or the tab was hidden, while the passkey prompt was open: keep nothing. On
     // return the user shows the key again.
