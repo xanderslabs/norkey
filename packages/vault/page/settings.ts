@@ -6,7 +6,7 @@ import type { Address } from "viem";
 import { createApi } from "./api.js";
 import { readConfig } from "./config.js";
 import { showExport } from "./export.js";
-import { addPasskey, explain, signIn } from "./flows.js";
+import { addPasskey, explain, signIn, withUnlockedKey } from "./flows.js";
 import { showBusy, showMessage, showSettings } from "./view.js";
 
 const config = readConfig();
@@ -36,6 +36,19 @@ async function start(): Promise<void> {
   }
 }
 
+/** Sign-in never unwraps, so it cannot show that a passkey opens the wallet. This does: the user picks
+ *  any passkey, and withUnlockedKey unwraps K, checks it opens `address`, and zeroes it. K lives for
+ *  this one gesture, as in export. */
+async function test(address: Address): Promise<void> {
+  showBusy("Choose the passkey to test.");
+  try {
+    await withUnlockedKey(api, address, async () => {}, { local: false, pick: true });
+    showMessage("Passkey works", "This passkey opens your wallet.", [["Back", () => signedIn(address)]]);
+  } catch (e) {
+    failed(e, () => signedIn(address));
+  }
+}
+
 function signedIn(address: Address): void {
   showSettings(address, {
     add: async () => {
@@ -44,14 +57,19 @@ function signedIn(address: Address): void {
       );
       try {
         await addPasskey(api, config.rpId, address);
-        showMessage("Passkey added", "Added. Test it: sign in with the new passkey on the settings page.", [
-          ["Sign in again", home],
-          ["Back", () => signedIn(address)],
-        ]);
+        showMessage(
+          "Passkey added",
+          "Added. Test it now with Test a passkey, and on each device you will use it from.",
+          [
+            ["Test a passkey", () => void test(address)],
+            ["Back", () => signedIn(address)],
+          ],
+        );
       } catch (e) {
         failed(e, () => signedIn(address));
       }
     },
+    test: () => void test(address),
     exportKey: () => showExport(api, address, () => signedIn(address)),
   });
 }

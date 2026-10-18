@@ -106,14 +106,17 @@ export async function connectExisting(api: Api): Promise<{ address: Address }> {
 }
 
 /** One passkey gesture: unwrap K, check it opens `from`, run `use`, then zero K and the PRF output.
- *  `refuse` names a passkey that has no wrap yet (add-a-passkey's new one). `local` as in getPasskey. */
+ *  `refuse` names a passkey that has no wrap yet (add-a-passkey's new one). `local` as in getPasskey.
+ *  `pick` asks for any passkey instead of the remembered one and leaves the remembered one as it was:
+ *  Test a passkey on the settings page checks a passkey without changing which one the next prompt
+ *  targets. */
 export async function withUnlockedKey<T>(
   api: Api,
   from: string,
   use: (key: Uint8Array, userId: string) => Promise<T>,
-  opts: { refuse?: string; local?: boolean } = {},
+  opts: { refuse?: string; local?: boolean; pick?: boolean } = {},
 ): Promise<T> {
-  const lo = await api.loginOptions(recalledCredential());
+  const lo = await api.loginOptions(opts.pick ? undefined : recalledCredential());
   const got = await getPasskey(lo.options, opts.local);
   let key: Uint8Array | undefined;
   try {
@@ -130,7 +133,7 @@ export async function withUnlockedKey<T>(
       address: res.wallet.address,
     });
     const result = await use(key, res.userId);
-    rememberCredential(got.response.id);
+    if (!opts.pick) rememberCredential(got.response.id);
     return result;
   } finally {
     key?.fill(0);

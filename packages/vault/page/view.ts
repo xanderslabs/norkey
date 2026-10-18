@@ -57,7 +57,7 @@ export function showMessage(title: string, message: string, actions: [string, ()
 const LOSS_RULE =
   "Each passkey you add can open this wallet. If you lose every passkey and never exported your key, the wallet is lost.";
 
-export function showSettings(address: string, actions: { add: () => void; exportKey: () => void }) {
+export function showSettings(address: string, actions: { add: () => void; test: () => void; exportKey: () => void }) {
   const details = el("div", undefined, "details");
   details.append(row("Address", address));
   screen(
@@ -65,6 +65,7 @@ export function showSettings(address: string, actions: { add: () => void; export
     details,
     el("p", LOSS_RULE),
     button("Add a passkey", actions.add, true),
+    button("Test a passkey", actions.test),
     button("Export wallet key", actions.exportKey),
   );
 }

@@ -55,7 +55,7 @@ function offerBackup(address: Address): Promise<void> {
           );
           try {
             await addPasskey(api, config.rpId, address);
-            showMessage("Backup added", "Added. Test it: sign in with the new passkey on the settings page.", [
+            showMessage("Backup added", "Added. Test it on the settings page with Test a passkey.", [
               ["Continue", done],
             ]);
           } catch (e) {

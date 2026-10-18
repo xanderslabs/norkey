@@ -56,7 +56,11 @@ is the settings page. The user signs in with a passkey, then can:
 - **Add a passkey**: one more passkey that opens the same wallet. It can be in another passkey
   provider, in another device's provider, or on a hardware security key that supports PRF. The
   browser asks three times: create the new passkey, confirm it, then unlock with a passkey the
-  wallet already has. Then sign in with the new passkey on the settings page to test it.
+  wallet already has. If you signed in more than 5 minutes ago, it asks four times: a sign-in
+  comes first. Then test the new passkey with **Test a passkey**, on each device you will use it
+  from.
+- **Test a passkey**: pick any of your passkeys. The page checks that it opens the wallet, which a
+  sign-in does not check, and says "This passkey opens your wallet." or why it does not.
 - **Export wallet key**: the private key as hex and as a QR code, after three warnings, a checkbox
   and one passkey prompt. Anyone with the key controls the wallet, and it cannot be revoked. The
   page wipes it when you leave the screen, click **Hide**, or after 60 seconds.
