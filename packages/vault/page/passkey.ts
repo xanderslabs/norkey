@@ -33,6 +33,7 @@ export class PasskeyError extends Error {
 }
 
 export const CROSS_DEVICE_REJECTED = "This wallet's passkey is not on this device. Use a passkey saved on this device.";
+const NO_PRF = "This passkey cannot open the wallet: it returned no PRF.";
 const LOCAL_HINTS = ["client-device"] as const;
 const prfExtension = { prf: { eval: { first: bytesToArrayBuffer(PRF_INPUT) } } };
 
@@ -130,7 +131,11 @@ export async function getPasskey(
   if (!assertion) throw new CancelledError();
   const prfOutput = readPrf(assertion);
   if (!prfOutput) {
-    if (assertion.authenticatorAttachment === "cross-platform") throw new PasskeyError(CROSS_DEVICE_REJECTED);
+    // App requests ask for a passkey on this device, so a cross-platform one gets today's message. The
+    // settings page and add-a-passkey accept one, so there the message names the real cause.
+    if (assertion.authenticatorAttachment === "cross-platform") {
+      throw new PasskeyError(local ? CROSS_DEVICE_REJECTED : NO_PRF);
+    }
     throw new NoPrfError();
   }
   // Slice 4, decision 6: a passkey from another device or a hardware key goes on when it returns PRF

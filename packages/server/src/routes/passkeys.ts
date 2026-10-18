@@ -1,4 +1,4 @@
-import { AuthError, verifyNewPasskey } from "../auth/passkey.js";
+import { verifyNewPasskey } from "../auth/passkey.js";
 import type { ResolvedConfig } from "../config.js";
 import { isWrap } from "./wallet.js";
 
@@ -15,7 +15,9 @@ export async function addPasskey(
   }
   if (!(await config.storage.getWallet(userId))) return { status: 409, body: { error: "no wallet" } };
   const stored = await config.storage.takeChallenge(challengeId);
-  if (!stored) throw new AuthError();
+  // Missing and expired look the same: takeChallenge returns null for both, and putChallenge purges
+  // expired rows. The page sends each challenge once, so a null here is almost always a slow add.
+  if (!stored) return { status: 401, body: { error: "This took too long. Try again." } };
   // A challenge is bound to the user it was issued for.
   if (stored.userId !== userId) return { status: 403, body: { error: "challenge was issued to another user" } };
   const credential = await verifyNewPasskey(config, stored.challenge, userId, response as never);

@@ -30,7 +30,7 @@ async function start(): Promise<void> {
   try {
     const address = await signIn(api, undefined, false);
     if (address) signedIn(address);
-    else showMessage("No wallet", "This passkey has no wallet. Open your app to create one.");
+    else showMessage("No wallet", "This passkey has no wallet. Open your app to create one.", [["Back", home]]);
   } catch (e) {
     failed(e, home);
   }
