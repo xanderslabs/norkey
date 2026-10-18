@@ -3,7 +3,14 @@ import type { Address, Hex } from "viem";
 import { type Api, ApiError } from "./api.js";
 import { RequestError, signPreparedCalls, signUserOp } from "./calls.js";
 import { bytesToBase64Url } from "./encoding.js";
-import { CancelledError, createPasskey, getPasskey, NoPrfError, PasskeyError } from "./passkey.js";
+import {
+  CancelledError,
+  CROSS_DEVICE_REJECTED,
+  createPasskey,
+  getPasskey,
+  NoPrfError,
+  PasskeyError,
+} from "./passkey.js";
 import { addressOf, generateWalletKey, unwrapKey, WrapError, wrapKey } from "./wrap.js";
 
 export class FlowError extends Error {
@@ -82,6 +89,9 @@ export async function connectExisting(api: Api): Promise<{ address: Address }> {
     if (!address) {
       // A create that failed after registering this passkey left a user with no wallet. Finish setup
       // with this gesture's PRF output instead of sending the user off to make a second passkey.
+      // That wrap is the wallet's only one, so a passkey from another device cannot make it: over the
+      // QR code its PRF value may differ from the one it gives on its own device (spec fact 1).
+      if (got.response.authenticatorAttachment === "cross-platform") throw new PasskeyError(CROSS_DEVICE_REJECTED);
       address = await createWalletUnder(api, {
         prfOutput: got.prfOutput,
         credentialId: got.response.id,

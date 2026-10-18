@@ -32,7 +32,7 @@ export class PasskeyError extends Error {
   }
 }
 
-const CROSS_DEVICE_REJECTED = "This wallet's passkey is not on this device. Use a passkey saved on this device.";
+export const CROSS_DEVICE_REJECTED = "This wallet's passkey is not on this device. Use a passkey saved on this device.";
 const LOCAL_HINTS = ["client-device"] as const;
 const prfExtension = { prf: { eval: { first: bytesToArrayBuffer(PRF_INPUT) } } };
 
