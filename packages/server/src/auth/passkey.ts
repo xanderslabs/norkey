@@ -169,6 +169,11 @@ export async function registerVerify(
     await config.storage.addCredential(c);
     return mapped;
   }
+  // A challenge issued to an existing user (another app user's, or a /passkeys/options one) cannot
+  // create a new user under this app user.
+  if ((await config.storage.listCredentialIds(stored.userId)).length > 0) {
+    throw new ConflictError("this account already has a NorKey user");
+  }
   try {
     await config.storage.createUserWithCredential(c, externalId);
   } catch (e) {
