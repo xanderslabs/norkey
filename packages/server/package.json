@@ -4,11 +4,18 @@
   "type": "module",
   "license": "MIT",
   "bin": { "norkey": "./dist/serve.js" },
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./postgres": { "types": "./dist/postgres.d.ts", "import": "./dist/postgres.js" }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:pg": "NORKEY_PG=1 vitest run --no-file-parallelism test/authz.test.ts test/storage.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json"
   },
-  "dependencies": { "@simplewebauthn/server": "^13.3.3" }
+  "dependencies": { "@simplewebauthn/server": "^13.3.3" },
+  "peerDependencies": { "postgres": "^3" },
+  "peerDependenciesMeta": { "postgres": { "optional": true } },
+  "devDependencies": { "postgres": "^3.4.9" }
 }

@@ -32,6 +32,11 @@ if (Object.keys(paymasterProxy).length > 0 && process.env.NORKEY_PAYMASTER_ALLOW
   process.exit(1);
 }
 
+// Postgres when DATABASE_URL is set, else SQLite. The import is dynamic so SQLite needs no postgres.js.
+const storage = process.env.DATABASE_URL
+  ? (await import("./postgres.js")).postgres(process.env.DATABASE_URL)
+  : sqlite(process.env.NORKEY_DB ?? "./norkey.db");
+
 const handler = createNorKeyHandler({
   rpId: required("NORKEY_RP_ID"),
   rpName: process.env.NORKEY_RP_NAME,
@@ -43,7 +48,7 @@ const handler = createNorKeyHandler({
     .map((s) => s.trim())
     .filter(Boolean),
   cookieDomain: process.env.NORKEY_COOKIE_DOMAIN,
-  storage: sqlite(process.env.NORKEY_DB ?? "./norkey.db"),
+  storage,
   paymasterProxy,
 });
 const port = Number(process.env.NORKEY_PORT ?? 8787);

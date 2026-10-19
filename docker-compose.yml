@@ -1,0 +1,15 @@
+# Postgres for the server's test:pg run and the custom-mode demo. Test data is throwaway: no volume.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: norkey
+      POSTGRES_PASSWORD: norkey
+      POSTGRES_DB: norkey
+    ports:
+      - "54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U norkey -d norkey"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
