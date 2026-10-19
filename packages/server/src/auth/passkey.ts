@@ -9,7 +9,7 @@ import {
   verifyRegistrationResponse,
 } from "@simplewebauthn/server";
 import type { ResolvedConfig } from "../config.js";
-import type { StoredCredential } from "../storage/types.js";
+import { ExternalIdTakenError, type StoredCredential } from "../storage/types.js";
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const LABEL_MAX = 64;
@@ -18,6 +18,14 @@ export class AuthError extends Error {
   constructor() {
     super("passkey verification failed");
     this.name = "AuthError";
+  }
+}
+
+/** A request that conflicts with the account's state, answered with 409 and this message. */
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConflictError";
   }
 }
 
@@ -35,8 +43,11 @@ function passkeyName(label: unknown, userID: Uint8Array): string {
   return clean || `NorKey wallet ${Buffer.from(userID).toString("hex").slice(0, 6)}`;
 }
 
-export async function registerOptions(config: ResolvedConfig, label?: unknown) {
-  const userID = randomBytes(16);
+/** Creation options for a new user's first passkey. In custom mode, `existingUserId` is the app user's
+ *  NorKey user when it has no wallet yet (slice 5, decision 7): the new passkey lands on that user.
+ *  No excludeCredentials, so the user can retry in the provider that failed. */
+export async function registerOptions(config: ResolvedConfig, label?: unknown, existingUserId?: string) {
+  const userID = existingUserId ? Buffer.from(existingUserId, "base64url") : randomBytes(16);
   const options = await generateRegistrationOptions({
     rpName: config.rpName ?? config.rpId,
     rpID: config.rpId,
@@ -114,11 +125,15 @@ export async function verifyNewPasskey(
   };
 }
 
-/** Verifies a registration and creates the user and credential. Returns the new user id. */
+/** Verifies a registration and creates the user and credential. Returns the user id. In custom mode,
+ *  `externalId` is the app's user: an existing NorKey user of that app user gets the credential only
+ *  if the challenge was issued to it and it has no wallet; otherwise the user is created with that
+ *  external id. A second tab that got there first answers ConflictError. */
 export async function registerVerify(
   config: ResolvedConfig,
   challengeId: string,
   response: RegistrationResponseJSON,
+  externalId?: string,
 ): Promise<string> {
   const stored = await config.storage.takeChallenge(challengeId);
   if (!stored?.userId) throw new AuthError();
@@ -136,21 +151,48 @@ export async function registerVerify(
   }
   if (!verification.verified || !verification.registrationInfo) throw new AuthError();
   const { credential } = verification.registrationInfo;
-  await config.storage.createUserWithCredential({
+  const c: StoredCredential = {
     credentialId: credential.id,
     userId: stored.userId,
     publicKey: credential.publicKey,
     signCount: credential.counter,
     transports: credential.transports ?? [],
-  });
+  };
+  if (externalId === undefined) {
+    await config.storage.createUserWithCredential(c);
+    return stored.userId;
+  }
+  const mapped = await config.storage.getUserIdByExternalId(externalId);
+  if (mapped) {
+    if (mapped !== stored.userId) throw new ConflictError("this account already has a NorKey user");
+    if (await config.storage.getWallet(mapped)) throw new ConflictError("this account already has a wallet");
+    await config.storage.addCredential(c);
+    return mapped;
+  }
+  try {
+    await config.storage.createUserWithCredential(c, externalId);
+  } catch (e) {
+    if (e instanceof ExternalIdTakenError) throw new ConflictError("this account already has a NorKey user");
+    throw e;
+  }
   return stored.userId;
 }
 
-export async function loginOptions(config: ResolvedConfig, credentialId?: string) {
+/** Request options for a sign-in. In custom mode, `allowIds` is every credential of the app user's
+ *  NorKey user, so the picker shows only those (slice 5, decision 6); `credentialId` narrows it only
+ *  if it is one of them. */
+export async function loginOptions(config: ResolvedConfig, credentialId?: string, allowIds?: string[]) {
+  const allow = allowIds
+    ? credentialId && allowIds.includes(credentialId)
+      ? [credentialId]
+      : allowIds
+    : credentialId
+      ? [credentialId]
+      : undefined;
   const options = await generateAuthenticationOptions({
     rpID: config.rpId,
     userVerification: "required",
-    allowCredentials: credentialId ? [{ id: credentialId }] : undefined,
+    allowCredentials: allow?.map((id) => ({ id })),
   });
   const challengeId = randomUUID();
   await config.storage.putChallenge({

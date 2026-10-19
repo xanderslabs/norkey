@@ -23,7 +23,7 @@ const rpcError = (id: unknown, code: number, message: string): Result => ({
  */
 export async function proxyPaymaster(
   entry: PaymasterProxyEntry,
-  a: { chainId: number; userId: string; address: string; body: unknown },
+  a: { chainId: number; userId: string; externalId: string | null; address: string; body: unknown },
 ): Promise<Result> {
   if (typeof a.body !== "object" || a.body === null || Array.isArray(a.body)) {
     return { status: 400, body: { error: "send one JSON-RPC request" } };
@@ -52,7 +52,14 @@ export async function proxyPaymaster(
       if (typeof params[2] !== "string" || Number(params[2]) !== a.chainId) {
         return rpcError(id, -32602, "The chainId does not match this proxy route.");
       }
-      const ok = await entry.allow({ userId: a.userId, address: a.address, chainId: a.chainId, method, userOp: op });
+      const ok = await entry.allow({
+        userId: a.userId,
+        externalId: a.externalId,
+        address: a.address,
+        chainId: a.chainId,
+        method,
+        userOp: op,
+      });
       if (!ok) return { status: 403, body: { error: "sponsorship not allowed" } };
       forward = [op, entryPoint, params[2], entry.context ?? {}];
     } else {

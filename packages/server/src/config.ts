@@ -1,6 +1,20 @@
 import type { NorKeyStorage } from "./storage/types.js";
 
-export type PaymasterAllowArgs = { userId: string; address: string; chainId: number; method: string; userOp: unknown };
+export type PaymasterAllowArgs = {
+  userId: string;
+  /** The app's user id in custom auth mode, null in built-in mode. */
+  externalId: string | null;
+  address: string;
+  chainId: number;
+  method: string;
+  userOp: unknown;
+};
+
+/** Who says who the user is. "passkey" (default): NorKey's own passkey sign-in. "custom": the app's
+ *  session, read by `getUserId`; a passkey assertion is still verified for every key operation. */
+export type AuthConfig =
+  | { mode: "passkey" }
+  | { mode: "custom"; getUserId: (req: Request) => string | null | Promise<string | null> };
 
 export type PaymasterProxyEntry = {
   /** The vendor's bundler and paymaster URL, API key included. Never sent to a client. */
@@ -29,6 +43,8 @@ export type NorKeyHandlerConfig = {
   sessionTtlSeconds?: number;
   /** Per chain id: relay ERC-7677 and bundler calls for signed-in users to this vendor URL. */
   paymasterProxy?: Record<number, PaymasterProxyEntry>;
+  /** Default { mode: "passkey" }. Custom mode reads the app's own session cookie in `getUserId`. */
+  auth?: AuthConfig;
 };
 
 export type ResolvedConfig = Required<Omit<NorKeyHandlerConfig, "rpName" | "cookieDomain" | "paymasterProxy">> &
@@ -76,8 +92,16 @@ export function resolveConfig(c: NorKeyHandlerConfig): ResolvedConfig {
   if (proxied.length > 0 && appOrigins.length === 0) {
     throw new Error("NorKey: appOrigins must list the app's origin when paymasterProxy is set");
   }
+  const auth: AuthConfig = c.auth ?? { mode: "passkey" };
+  if (auth.mode !== "passkey" && auth.mode !== "custom") {
+    throw new Error('NorKey: auth.mode must be "passkey" or "custom"');
+  }
+  if (auth.mode === "custom" && typeof auth.getUserId !== "function") {
+    throw new Error("NorKey: auth.getUserId is required in custom mode");
+  }
   return {
     ...c,
+    auth,
     appOrigins,
     basePath: (c.basePath ?? "/norkey").replace(/\/$/, ""),
     sessionTtlSeconds: c.sessionTtlSeconds ?? 7 * 24 * 3600,

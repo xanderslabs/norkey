@@ -1,4 +1,4 @@
-export type { NorKeyHandlerConfig, PaymasterAllowArgs, PaymasterProxyEntry } from "./config.js";
+export type { AuthConfig, NorKeyHandlerConfig, PaymasterAllowArgs, PaymasterProxyEntry } from "./config.js";
 export { createNorKeyHandler } from "./handler.js";
 export { MAX_BODY_BYTES, nodeListener } from "./node-listener.js";
 export { sqlite } from "./storage/sqlite.js";
