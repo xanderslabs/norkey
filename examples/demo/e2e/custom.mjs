@@ -187,6 +187,18 @@ try {
   await page.goto("http://localhost:5173/");
   await page.waitForFunction(() => document.getElementById("app-current")?.textContent === "alice");
   await appSignOut();
+  // Signed out again: connect rejects with 4100. The page reloaded above, so its log starts empty and
+  // this is the first one; counting keeps a stale 4100 from passing the check.
+  await page.click("#connect");
+  await wallet().getByText("Sign in to the app first.").waitFor();
+  await page.waitForFunction(
+    () => (document.getElementById("log")?.textContent?.match(/error 4100/g) ?? []).length === 1,
+    null,
+    { timeout: 15000 },
+  );
+  // The window.open stub's iframe outlives window.close(), so remove it by hand.
+  await page.evaluate(() => document.querySelectorAll("iframe").forEach((f) => f.remove()));
+  console.log("5a. signed out of the app: connect rejected with 4100");
   await appSignIn("bob");
   assert.equal(await page.locator("iframe").count(), 0);
   await page.click("#connect");
