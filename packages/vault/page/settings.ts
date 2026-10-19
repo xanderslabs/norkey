@@ -34,6 +34,10 @@ async function start(): Promise<void> {
       showMessage("Sign in to the app first", "Open your app, sign in, then come back here.", [["Back", home]]);
       return;
     }
+    if (status.mode === "custom" && !status.hasUser) {
+      showMessage("No wallet", "Open your app to create one.", [["Back", home]]);
+      return;
+    }
     const address = await signIn(api, undefined, false);
     if (address) signedIn(address);
     else showMessage("No wallet", "This passkey has no wallet. Open your app to create one.", [["Back", home]]);
