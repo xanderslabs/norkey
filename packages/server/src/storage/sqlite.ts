@@ -1,8 +1,14 @@
 import { DatabaseSync } from "node:sqlite";
-import { type NorKeyStorage, type StoredCredential, type StoredWrap, WalletExistsError } from "./types.js";
+import {
+  ExternalIdTakenError,
+  type NorKeyStorage,
+  type StoredCredential,
+  type StoredWrap,
+  WalletExistsError,
+} from "./types.js";
 
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, created_at INTEGER NOT NULL, external_id TEXT);
 CREATE TABLE IF NOT EXISTS credentials (
   credential_id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
   public_key BLOB NOT NULL, sign_count INTEGER NOT NULL, transports TEXT NOT NULL, created_at INTEGER NOT NULL);
@@ -25,6 +31,10 @@ export function sqlite(path: string): NorKeyStorage {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
   db.exec(SCHEMA);
+  // A database made before slice 5 has no external_id column.
+  const userColumns = db.prepare("PRAGMA table_info(users)").all() as Row[];
+  if (!userColumns.some((col) => col.name === "external_id")) db.exec("ALTER TABLE users ADD COLUMN external_id TEXT");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_external_id ON users(external_id)");
 
   const toWrap = (r: Row): StoredWrap => ({
     id: r.id as string,
@@ -44,18 +54,27 @@ export function sqlite(path: string): NorKeyStorage {
         "INSERT INTO credentials (credential_id, user_id, public_key, sign_count, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)",
       ).run(c.credentialId, c.userId, c.publicKey, c.signCount, JSON.stringify(c.transports), Date.now());
     },
-    async createUserWithCredential(c) {
+    async createUserWithCredential(c, externalId) {
       db.exec("BEGIN");
       try {
-        db.prepare("INSERT INTO users (id, created_at) VALUES (?, ?)").run(c.userId, Date.now());
+        db.prepare("INSERT INTO users (id, created_at, external_id) VALUES (?, ?, ?)").run(
+          c.userId,
+          Date.now(),
+          externalId ?? null,
+        );
         db.prepare(
           "INSERT INTO credentials (credential_id, user_id, public_key, sign_count, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)",
         ).run(c.credentialId, c.userId, c.publicKey, c.signCount, JSON.stringify(c.transports), Date.now());
         db.exec("COMMIT");
       } catch (e) {
         db.exec("ROLLBACK");
+        if (e instanceof Error && e.message.includes("users.external_id")) throw new ExternalIdTakenError();
         throw e;
       }
+    },
+    async getUserIdByExternalId(externalId) {
+      const r = db.prepare("SELECT id FROM users WHERE external_id = ?").get(externalId) as Row | undefined;
+      return r ? (r.id as string) : null;
     },
     async getCredential(credentialId) {
       const r = db.prepare("SELECT * FROM credentials WHERE credential_id = ?").get(credentialId) as Row | undefined;

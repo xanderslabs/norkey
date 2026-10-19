@@ -19,8 +19,13 @@ export type StoredCredential = {
 export interface NorKeyStorage {
   createUser(userId: string): Promise<void>;
   addCredential(c: StoredCredential): Promise<void>;
-  /** The user row and its first credential in one transaction: both or neither. */
-  createUserWithCredential(c: StoredCredential): Promise<void>;
+  /**
+   * The user row and its first credential in one transaction: both or neither. Stores `external_id`
+   * when given; throws ExternalIdTakenError if another user already has it.
+   */
+  createUserWithCredential(c: StoredCredential, externalId?: string): Promise<void>;
+  /** The NorKey user id mapped to this app user id, or null. Used by custom auth mode. */
+  getUserIdByExternalId(externalId: string): Promise<string | null>;
   getCredential(credentialId: string): Promise<StoredCredential | null>;
   /** The ids of every credential of this user, oldest first. */
   listCredentialIds(userId: string): Promise<string[]>;
@@ -46,5 +51,12 @@ export class WalletExistsError extends Error {
   constructor() {
     super("This user already has a wallet");
     this.name = "WalletExistsError";
+  }
+}
+
+export class ExternalIdTakenError extends Error {
+  constructor() {
+    super("This app user already has a NorKey user");
+    this.name = "ExternalIdTakenError";
   }
 }

@@ -3,9 +3,10 @@
 // wrong user still breaks the "only your passkey opens your wallet" boundary and enables row swaps.
 import { createHash } from "node:crypto";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { loginVerify } from "../src/auth/passkey.js";
-import { createNorKeyHandler, sqlite } from "../src/index.js";
+import { createNorKeyHandler } from "../src/index.js";
+import { makeStorage, type TestStorage } from "./adapters.js";
 
 // Only the test below drives POST /login/verify; WebAuthn itself cannot run here, so its result is
 // supplied. The handler's own wallet and wrap lookups run for real.
@@ -22,8 +23,14 @@ vi.mock("@simplewebauthn/server", async (importOriginal) => ({
 const origin = "http://localhost:5174";
 const app = "http://localhost:5173";
 const TTL_SECONDS = 3600;
+const opened: TestStorage[] = [];
+afterEach(async () => {
+  await Promise.all(opened.splice(0).map((t) => t.close()));
+});
 async function setup() {
-  const storage = sqlite(":memory:");
+  const test = await makeStorage();
+  opened.push(test);
+  const storage = test.storage;
   const handler = createNorKeyHandler({
     rpId: "localhost",
     origins: [origin],
