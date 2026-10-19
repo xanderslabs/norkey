@@ -26,13 +26,14 @@ function finish(r: PopupReply): void {
 
 function fail(id: string, e: unknown): void {
   // One error list for the popup and the settings page: explain() in flows.ts.
-  const message = explain(e);
+  const signedOut = isAppSignedOut(e);
+  const message = signedOut ? "Sign in to the app first." : explain(e);
   if (message === null) {
     finish({ v: PROTOCOL_VERSION, id, ok: false, code: 4001, message: "User rejected the request." });
     return;
   }
   showError(message);
-  const code = e instanceof RequestError ? -32602 : isAppSignedOut(e) ? 4100 : -32603;
+  const code = e instanceof RequestError ? -32602 : signedOut ? 4100 : -32603;
   // Leave the message visible briefly so the user sees why, then return the error to the app.
   setTimeout(() => finish({ v: PROTOCOL_VERSION, id, ok: false, code, message }), 2500);
 }
