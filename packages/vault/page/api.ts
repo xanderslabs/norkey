@@ -17,6 +17,19 @@ export class ApiError extends Error {
   }
 }
 
+/** The server's 401 error when the app's user is signed out (custom mode). Matched exactly: the popup
+ *  then replies 4100 (slice 5, decision 16). */
+export const APP_SIGNED_OUT = "sign in to the app first";
+
+export function isAppSignedOut(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 401 && e.message === APP_SIGNED_OUT;
+}
+
+export type Status =
+  | { mode: "passkey" }
+  | { mode: "custom"; signedIn: false }
+  | { mode: "custom"; signedIn: true; hasUser: boolean; hasWallet: boolean };
+
 export type LoginResult = { userId: string; wallet: { address: Address } | null; wrap: Wrap | null };
 
 /** Calls to the NorKey server. Every parameter is public data: passkey responses without extension
@@ -34,6 +47,7 @@ export function createApi(apiUrl: string) {
     return json as T;
   }
   return {
+    status: () => call<Status>("/status"),
     registerOptions: (label?: string) =>
       call<{ challengeId: string; options: PublicKeyCredentialCreationOptionsJSON }>(
         "/register/options",

@@ -28,6 +28,12 @@ function failed(e: unknown, back: () => void): void {
 async function start(): Promise<void> {
   showBusy("Waiting for your passkey...");
   try {
+    // Custom mode: the app's user must be signed in before NorKey's sign-in can work (slice 5).
+    const status = await api.status();
+    if (status.mode === "custom" && !status.signedIn) {
+      showMessage("Sign in to the app first", "Open your app, sign in, then come back here.", [["Back", home]]);
+      return;
+    }
     const address = await signIn(api, undefined, false);
     if (address) signedIn(address);
     else showMessage("No wallet", "This passkey has no wallet. Open your app to create one.", [["Back", home]]);

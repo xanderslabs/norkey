@@ -7,11 +7,12 @@ import {
   type PreparedUserOp,
 } from "@norkey/client/protocol";
 import type { Address } from "viem";
-import { createApi } from "./api.js";
+import { ApiError, createApi, isAppSignedOut, type Status } from "./api.js";
 import { RequestError, validateCalls, validateUserOp } from "./calls.js";
 import { acceptRequest, announceAlive, announceReady, reply } from "./channel.js";
 import { type PageConfig, readConfig } from "./config.js";
 import { addPasskey, connectCreate, connectExisting, explain, signCalls, signUserOperation } from "./flows.js";
+import { CROSS_DEVICE_REJECTED, NoPrfError, PasskeyError } from "./passkey.js";
 import { showBackupOffer, showBusy, showConnect, showConsent, showError, showMessage, showWaiting } from "./view.js";
 
 const config = readConfig();
@@ -31,7 +32,7 @@ function fail(id: string, e: unknown): void {
     return;
   }
   showError(message);
-  const code = e instanceof RequestError ? -32602 : -32603;
+  const code = e instanceof RequestError ? -32602 : isAppSignedOut(e) ? 4100 : -32603;
   // Leave the message visible briefly so the user sees why, then return the error to the app.
   setTimeout(() => finish({ v: PROTOCOL_VERSION, id, ok: false, code, message }), 2500);
 }
@@ -79,26 +80,93 @@ function offerBackup(address: Address): Promise<void> {
   });
 }
 
-function handle(req: PopupRequest, origin: string): void {
-  if (req.kind === "connect") {
-    const run = (flow: () => Promise<{ address: `0x${string}` }>) => async () => {
+/** Connect. Built-in mode offers create or unlock, as before slice 5. Custom mode asks the server who
+ *  the app's user is and goes straight to the one step that fits (slice 5, section 6). */
+async function connect(req: PopupRequest & { kind: "connect" }, origin: string): Promise<void> {
+  const cancel = reject(req.id);
+  /** `recover` handles an error itself and returns true, or returns false to reply with it. */
+  const run =
+    (flow: () => Promise<{ address: Address }>, recover: (e: unknown) => boolean = () => false) =>
+    async () => {
       showBusy("Waiting for your passkey...");
       try {
         const { address } = await flow();
         finish({ v: PROTOCOL_VERSION, id: req.id, ok: true, kind: "connect", address });
       } catch (e) {
-        fail(req.id, e);
+        if (!recover(e)) fail(req.id, e);
       }
     };
-    showConnect(origin, {
-      create: run(async () => {
-        const created = await connectCreate(api, req.label);
-        await offerBackup(created.address);
-        return created;
-      }),
-      existing: run(() => connectExisting(api)),
-      cancel: reject(req.id),
-    });
+  const createFlow = async () => {
+    const created = await connectCreate(api, req.label);
+    await offerBackup(created.address);
+    return created;
+  };
+
+  showBusy("Checking your account...");
+  let status: Status;
+  try {
+    status = await api.status();
+  } catch (e) {
+    fail(req.id, e);
+    return;
+  }
+  if (status.mode === "passkey") {
+    showConnect(origin, { create: run(createFlow), existing: run(() => connectExisting(api)), cancel });
+    return;
+  }
+  if (!status.signedIn) {
+    showError("Sign in to the app first.");
+    setTimeout(
+      () => finish({ v: PROTOCOL_VERSION, id: req.id, ok: false, code: 4100, message: "Sign in to the app first." }),
+      2500,
+    );
+    return;
+  }
+  // A 409 means this app user already has a NorKey user (another tab got there first, or it has a
+  // wallet): ask the server again, which leads to unlock.
+  const create = run(createFlow, (e) => {
+    if (!(e instanceof ApiError && e.status === 409)) return false;
+    void connect(req, origin);
+    return true;
+  });
+  if (!status.hasUser) {
+    showMessage("Create your wallet", "Your app account gets a wallet that only your passkey opens.", [
+      ["Create wallet", create],
+      ["Cancel", cancel],
+    ]);
+    return;
+  }
+  // A user with no wallet is an earlier create that stopped after registering the passkey. When that
+  // passkey cannot finish setup here, a new passkey joins the same NorKey user (decision 7).
+  const orphan = !status.hasWallet;
+  const existing = run(
+    () => connectExisting(api),
+    (e) => {
+      if (!orphan) return false;
+      if (!(e instanceof NoPrfError || (e instanceof PasskeyError && e.message === CROSS_DEVICE_REJECTED))) {
+        return false;
+      }
+      showMessage(
+        "Finish setting up",
+        `${explain(e)} You can create a new passkey on this device instead.`,
+        [
+          ["Create a new passkey", create],
+          ["Cancel", cancel],
+        ],
+        true,
+      );
+      return true;
+    },
+  );
+  showMessage("Unlock your wallet", "Use the passkey you saved for this account.", [
+    ["Use my passkey", existing],
+    ["Cancel", cancel],
+  ]);
+}
+
+function handle(req: PopupRequest, origin: string): void {
+  if (req.kind === "connect") {
+    void connect(req, origin);
     return;
   }
   if (req.kind === "sign-calls") {

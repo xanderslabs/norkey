@@ -14,6 +14,12 @@
   </head>
   <body>
     <h1>NorKey demo</h1>
+    <div id="app-login" hidden>
+      <label>App user <input id="app-user" placeholder="alice" /></label>
+      <button id="app-sign-in">Sign in to the app</button>
+      <button id="app-sign-out">Sign out of the app</button>
+      <p>App user: <code id="app-current">signed out</code></p>
+    </div>
     <label>Chain
       <select id="chain">
         <option value="11155111">Sepolia</option>

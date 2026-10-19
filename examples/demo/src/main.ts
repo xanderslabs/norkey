@@ -87,6 +87,42 @@ $("disconnect").addEventListener("click", async () => {
 
 $("refresh").addEventListener("click", () => refresh().catch(report));
 
+// A stub app login for custom auth mode (VITE_CUSTOM_AUTH=1, with custom-server.mjs). The NorKey server
+// reads the app's user from the demo_user cookie. A real app sets this cookie from its server,
+// HttpOnly, with Domain=<registrable domain> so it reaches the NorKey handler from the boundary page's
+// origin too. On localhost a cookie is shared across ports, so this one set by the page is enough.
+if (import.meta.env.VITE_CUSTOM_AUTH === "1") {
+  $("app-login").hidden = false;
+  const showAppUser = () => {
+    const raw = document.cookie
+      .split("; ")
+      .find((c) => c.startsWith("demo_user="))
+      ?.slice("demo_user=".length);
+    $("app-current").textContent = raw ? decodeURIComponent(raw) : "signed out";
+  };
+  showAppUser();
+  $("app-sign-in").addEventListener("click", () => {
+    const name = ($("app-user") as HTMLInputElement).value.trim();
+    if (!name) return log("type an app user name first");
+    document.cookie = `demo_user=${encodeURIComponent(name)}; Path=/; SameSite=Lax`;
+    showAppUser();
+    log(`app user ${name} signed in`);
+  });
+  $("app-sign-out").addEventListener("click", async () => {
+    // An app in custom mode disconnects NorKey on sign-out, so the next user does not get this
+    // user's address (slice 5, decision 15).
+    try {
+      await norkey.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] });
+    } catch {}
+    document.cookie = "demo_user=; Path=/; Max-Age=0; SameSite=Lax";
+    account = undefined;
+    $("address").textContent = "not connected";
+    $("balance").textContent = "-";
+    showAppUser();
+    log("app user signed out");
+  });
+}
+
 $("send").addEventListener("click", async () => {
   if (!account) return log("connect first");
   try {
