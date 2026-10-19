@@ -159,6 +159,11 @@ export async function registerVerify(
     transports: credential.transports ?? [],
   };
   if (externalId === undefined) {
+    // A challenge from /passkeys/options names the signed-in user, who has credentials. Replaying it
+    // here cannot create that user again.
+    if ((await config.storage.listCredentialIds(stored.userId)).length > 0) {
+      throw new ConflictError("this account already has a NorKey user");
+    }
     await config.storage.createUserWithCredential(c);
     return stored.userId;
   }
@@ -170,7 +175,7 @@ export async function registerVerify(
     return mapped;
   }
   // A challenge issued to an existing user (another app user's, or a /passkeys/options one) cannot
-  // create a new user under this app user.
+  // create a new user under this app user. The built-in branch above applies the same check.
   if ((await config.storage.listCredentialIds(stored.userId)).length > 0) {
     throw new ConflictError("this account already has a NorKey user");
   }
