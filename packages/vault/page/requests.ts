@@ -158,7 +158,11 @@ async function connect(req: PopupRequest & { kind: "connect" }, origin: string):
       return true;
     },
   );
-  showMessage("Unlock your wallet", "Use the passkey you saved for this account.", [
+  // A user with a wallet may have saved the passkey on another device (slice 5, section 6).
+  const unlockText = orphan
+    ? "Use the passkey you saved for this account."
+    : "Use the passkey you saved for this account. If it is on another device, use a synced passkey or your phone over the QR code.";
+  showMessage("Unlock your wallet", unlockText, [
     ["Use my passkey", existing],
     ["Cancel", cancel],
   ]);
