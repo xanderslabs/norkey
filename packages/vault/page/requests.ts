@@ -9,7 +9,7 @@ import {
 import type { Address } from "viem";
 import { createApi } from "./api.js";
 import { RequestError, validateCalls, validateUserOp } from "./calls.js";
-import { acceptRequest, announceReady, reply } from "./channel.js";
+import { acceptRequest, announceAlive, announceReady, reply } from "./channel.js";
 import { type PageConfig, readConfig } from "./config.js";
 import { addPasskey, connectCreate, connectExisting, explain, signCalls, signUserOperation } from "./flows.js";
 import { showBackupOffer, showBusy, showConnect, showConsent, showError, showMessage, showWaiting } from "./view.js";
@@ -167,6 +167,7 @@ export function startRequests(): void {
     const req = acceptRequest(event, config.appOrigins);
     if (!req || pending) return;
     pending = req;
+    setInterval(announceAlive, 60_000);
     handle(req, event.origin);
   });
   announceReady(config.appOrigins);

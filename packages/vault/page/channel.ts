@@ -1,5 +1,11 @@
 // The only module that talks to the opener. It never imports key material.
-import { type PopupReady, type PopupReply, type PopupRequest, PROTOCOL_VERSION } from "@norkey/client/protocol";
+import {
+  type PopupAlive,
+  type PopupReady,
+  type PopupReply,
+  type PopupRequest,
+  PROTOCOL_VERSION,
+} from "@norkey/client/protocol";
 
 let requesterOrigin: string | null = null;
 
@@ -21,6 +27,12 @@ export function acceptRequest(event: MessageEvent, appOrigins: string[]): PopupR
 export function announceReady(appOrigins: string[]): void {
   const ready: PopupReady = { v: PROTOCOL_VERSION, kind: "ready" };
   for (const o of appOrigins) window.opener?.postMessage(ready, o);
+}
+
+export function announceAlive(): void {
+  if (!requesterOrigin) return;
+  const alive: PopupAlive = { v: PROTOCOL_VERSION, kind: "alive" };
+  window.opener?.postMessage(alive, requesterOrigin);
 }
 
 export function reply(r: PopupReply): void {

@@ -70,3 +70,6 @@ export type PopupReply =
   | { v: 3; id: string; ok: false; code: 4001 | 4100 | 4900 | -32602 | -32603; message: string };
 
 export type PopupReady = { v: 3; kind: "ready" };
+
+/** Sent by the popup every 60 seconds while it is open. It has no `id` and no payload. */
+export type PopupAlive = { v: 3; kind: "alive" };

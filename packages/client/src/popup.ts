@@ -1,7 +1,7 @@
 import { ProviderRpcError } from "./errors.js";
 import { type PopupReply, type PopupRequest, PROTOCOL_VERSION } from "./protocol.js";
 
-/** How long to wait for the popup to reply before giving up. */
+/** How long the popup may go silent before giving up. The page says it is alive every 60 seconds. */
 const POPUP_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
@@ -53,15 +53,24 @@ export function openPopup(vaultOrigin: string, id: string, prepare: () => Promis
         send();
         return;
       }
+      if (data.kind === "alive") {
+        arm();
+        return;
+      }
       if (data.id !== id) return;
       cleanup();
       resolve(event.data as PopupReply);
     }
 
-    const timeoutId = setTimeout(() => {
-      cleanup();
-      reject(new ProviderRpcError(4001, "The wallet popup timed out."));
-    }, POPUP_TIMEOUT_MS);
+    function arm(): void {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new ProviderRpcError(4001, "The wallet popup timed out."));
+      }, POPUP_TIMEOUT_MS);
+    }
+    let timeoutId: ReturnType<typeof setTimeout>;
+    arm();
 
     // A closed popup and a reply posted just before closing can race. Defer the reject by one task
     // so an already-queued message event resolves first.
