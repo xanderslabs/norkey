@@ -6,11 +6,13 @@
     "dev": "vite --port 5173 --strictPort",
     "custom-server": "node custom-server.mjs",
     "e2e": "node e2e/journey.mjs",
-    "e2e:sponsored": "node e2e/sponsored.mjs"
+    "e2e:sponsored": "node e2e/sponsored.mjs",
+    "e2e:custom": "node e2e/custom.mjs"
   },
   "dependencies": {
     "@norkey/client": "workspace:*",
     "@norkey/server": "workspace:*",
+    "postgres": "^3.4.9",
     "viem": "^2.55.4"
   },
   "devDependencies": {

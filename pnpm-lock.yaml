@@ -29,6 +29,9 @@ importers:
       '@norkey/server':
         specifier: workspace:*
         version: link:../../packages/server
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
       viem:
         specifier: ^2.55.4
         version: 2.57.3(typescript@7.0.2)(zod@3.25.76)
