@@ -165,7 +165,7 @@ processes from the repo root.
    DATABASE_URL=postgres://norkey:norkey@localhost:54329/norkey pnpm --filter demo custom-server
    ```
 
-   Stop the database with `pnpm db:down`. It keeps no volume, so its data goes with it.
+   Stop the database with `pnpm db:down`. Its data is not kept between runs.
 
 2. The boundary page, with the same commands as in [Run it](#run-it).
 

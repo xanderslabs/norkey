@@ -1,4 +1,4 @@
-# Postgres for the server's test:pg run and the custom-mode demo. Test data is throwaway: no volume.
+# Postgres for the server's test:pg run and the custom-mode demo. Test data is throwaway: it is not kept between runs.
 services:
   postgres:
     image: postgres:17
