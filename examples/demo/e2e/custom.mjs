@@ -187,8 +187,8 @@ try {
   await page.goto("http://localhost:5173/");
   await page.waitForFunction(() => document.getElementById("app-current")?.textContent === "alice");
   await appSignOut();
-  // Signed out again: connect rejects with 4100. The page reloaded above, so its log starts empty and
-  // this is the first one; counting keeps a stale 4100 from passing the check.
+  // Signed out again: connect rejects with 4100. The page reloaded above, so its log starts empty;
+  // counting to exactly 1 also catches a duplicate 4100.
   await page.click("#connect");
   await wallet().getByText("Sign in to the app first.").waitFor();
   await page.waitForFunction(

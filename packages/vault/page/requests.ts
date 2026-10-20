@@ -25,7 +25,8 @@ function finish(r: PopupReply): void {
 }
 
 function fail(id: string, e: unknown): void {
-  // One error list for the popup and the settings page: explain() in flows.ts.
+  // One error list for the popup and the settings page: explain() in flows.ts. An app sign-out
+  // gets the connect screen's copy instead.
   const signedOut = isAppSignedOut(e);
   const message = signedOut ? "Sign in to the app first." : explain(e);
   if (message === null) {
