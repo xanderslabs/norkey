@@ -28,7 +28,13 @@ const norkeyChains = Object.entries(rpcs).map(
       ? { id: Number(id), rpcUrls: [url], gas: "sponsored", paymasterUrl: `${api}/paymaster/${id}` }
       : { id: Number(id), rpcUrls: [url], gas: "native" },
 );
-const norkey = createNorKeyProvider({ vaultOrigin, apiUrl: api, chains: norkeyChains, defaultChainId: sepolia.id });
+const norkey = createNorKeyProvider({
+  name: "NorKey demo",
+  vaultOrigin,
+  apiUrl: api,
+  chains: norkeyChains,
+  defaultChainId: sepolia.id,
+});
 const wallet = createWalletClient({ transport: custom(norkey) });
 const readers = new Map<number, PublicClient>();
 let chain: Chain = sepolia;

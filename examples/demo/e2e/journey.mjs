@@ -61,6 +61,19 @@ try {
   const address = await page.locator("#address").textContent();
   console.log("1. created", address);
 
+  // 1a. The EIP-6963 announce carries the app's wallet identity, not NorKey's.
+  const announced = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        window.addEventListener("eip6963:announceProvider", (e) => resolve({ ...e.detail.info }), { once: true });
+        window.dispatchEvent(new Event("eip6963:requestProvider"));
+      }),
+  );
+  assert.equal(announced.rdns, "localhost");
+  assert.equal(announced.name, "NorKey demo");
+  assert.ok(announced.icon.startsWith("data:image/svg+xml"));
+  console.log("1a. EIP-6963 announce: rdns localhost, name NorKey demo");
+
   // 2. The server holds one wallet and one wrap, and no plaintext.
   const sql = new DatabaseSync(db);
   const wallets = sql.prepare("SELECT address FROM wallets").all();

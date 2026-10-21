@@ -73,6 +73,7 @@ describe("one sponsored operation at a time", () => {
         },
       ],
       defaultChainId: 11155111,
+      name: "Test wallet",
     });
     const send = () =>
       provider.request({

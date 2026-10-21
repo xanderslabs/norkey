@@ -7,7 +7,7 @@ import type { AuthorizationReply, PreparedUserOp } from "./protocol.js";
 /** The proxy needs the NorKey session cookie, and it has expired. The provider forgets the address. */
 export class SessionExpiredError extends ProviderRpcError {
   constructor() {
-    super(4100, "Your NorKey session expired. Connect again.");
+    super(4100, "Your wallet session expired. Connect again.");
     this.name = "SessionExpiredError";
   }
 }

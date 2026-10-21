@@ -15,3 +15,8 @@ export function announceEip6963(provider: Eip1193Provider, info: Eip6963Provider
   announce();
   return () => window.removeEventListener("eip6963:requestProvider", announce);
 }
+
+/** The EIP-6963 `rdns` for an origin: its hostname with the labels reversed, e.g. "app.example.com" gives "com.example.app". */
+export function reverseHost(origin: string): string {
+  return new URL(origin).hostname.split(".").reverse().join(".");
+}

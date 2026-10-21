@@ -44,8 +44,12 @@ export type NorKeyProviderConfig = {
   apiUrl: string;
   chains: NorKeyChain[];
   defaultChainId: number;
+  /** The app's wallet name, shown in wallet pickers (EIP-6963). */
+  name: string;
+  /** A `data:` URI. Defaults to a neutral wallet icon. */
+  icon?: string;
   /** Names a new wallet's passkey in the browser's picker, e.g. the signed-in user's email. Called when
-   *  the connect popup opens. Missing or blank gives "NorKey wallet" and 6 random hex characters. */
+   *  the connect popup opens. Missing or blank gives the server's `rpName` and 6 random hex characters. */
   label?: () => string | undefined;
 };
 
