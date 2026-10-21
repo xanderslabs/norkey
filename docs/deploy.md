@@ -17,7 +17,7 @@ Run the server where your app's domain can reach it at `/norkey`. With `norkey s
 
 ```sh
 NORKEY_RP_ID=app.com NORKEY_RP_NAME="My App" NORKEY_ORIGINS=https://accounts.app.com \
-NORKEY_APP_ORIGINS=https://app.com NORKEY_DB=/data/norkey.db npx norkey serve
+NORKEY_APP_ORIGINS=https://app.com NORKEY_DB=/data/norkey.db npx --no-install norkey serve
 ```
 
 - Route `https://app.com/norkey/` to the server's port, `8787` by default (`NORKEY_PORT`), and keep
@@ -40,7 +40,7 @@ serve everything over HTTPS.
 Build the page with the production values, and your app's name and logo:
 
 ```sh
-npx norkey-vault build --rp-id app.com --api https://app.com/norkey --app-origin https://app.com \
+npx --no-install norkey-vault build --rp-id app.com --api https://app.com/norkey --app-origin https://app.com \
   --chains 11155111 --rp-name "My App" --logo ./logo.svg --out dist-vault
 ```
 
@@ -59,7 +59,7 @@ Serve `dist-vault/index.html` at `https://accounts.app.com/` with the headers th
 
 - On Netlify or Cloudflare Pages, deploy the `dist-vault` folder. Both read its `_headers` file.
 - On another host, set the response headers from `dist-vault/headers.json` yourself.
-- `npx norkey-vault serve --dir dist-vault` serves the page with those headers, on port `5174`.
+- `npx --no-install norkey-vault serve --dir dist-vault` serves the page with those headers, on port `5174`.
   Put it behind a TLS proxy.
 
 Give the boundary page its own subdomain, apart from the app's origin. Same-origin isolation is what
@@ -113,5 +113,9 @@ The user signs in with a passkey, then can:
 | `NORKEY_RP_ID` `app.com` | `--rp-id app.com` | |
 | `NORKEY_ORIGINS` `https://accounts.app.com` | Its own origin | `vaultOrigin` |
 | `NORKEY_APP_ORIGINS` `https://app.com` | `--app-origin https://app.com` | The app page's origin |
+| `NORKEY_RP_NAME` `My App` (or the handler's `rpName`) | `--rp-name "My App"` | |
 | Mounted at `https://app.com/norkey` | `--api https://app.com/norkey` | `apiUrl: "/norkey"` |
 | | `--chains` | `chains` |
+
+The page shows the `--rp-name` value, and the server names new passkeys from its own `rpName`. Set both
+to the same name.

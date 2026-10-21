@@ -196,7 +196,7 @@ token.
 ## norkey serve
 
 ```sh
-npx norkey serve
+npx --no-install norkey serve
 ```
 
 Starts the handler on `node:http` in passkey auth mode, at the default `basePath` `/norkey`. Any

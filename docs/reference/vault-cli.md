@@ -15,7 +15,7 @@ with code 1. The package declares Node 24 or later in `engines`.
 ## build
 
 ```sh
-npx norkey-vault build --rp-id app.com --api https://app.com/norkey \
+npx --no-install norkey-vault build --rp-id app.com --api https://app.com/norkey \
   --app-origin https://app.com --chains 11155111
 ```
 
@@ -59,7 +59,7 @@ delegate address, then the CSP. It also writes `headers.json`, which that line d
 ## serve
 
 ```sh
-npx norkey-vault serve --port 5174
+npx --no-install norkey-vault serve --port 5174
 ```
 
 Serves a built page with its headers from `headers.json`, and `cache-control: no-cache`.

@@ -12,7 +12,7 @@ it to Calibur, inside the sponsored bundle. Sending ETH still needs the ETH you 
 Use one vendor for both the paymaster and the bundler on a chain. The server sends both kinds of
 call to the same URL.
 
-- Candide's public endpoint sponsors on Sepolia with no key:
+- An example of an ERC-7677 paymaster URL is Candide's public endpoint for Sepolia:
   `https://api.candide.dev/public/v3/11155111`.
 - A keyed vendor URL works the same way, for example
   `https://api.pimlico.io/v2/11155111/rpc?apikey=<key>`.
@@ -27,7 +27,7 @@ rule:
 ```sh
 NORKEY_RP_ID=localhost NORKEY_ORIGINS=http://localhost:5174 NORKEY_APP_ORIGINS=http://localhost:5173 \
 NORKEY_PAYMASTER_11155111=https://api.candide.dev/public/v3/11155111 \
-NORKEY_PAYMASTER_ALLOW=all npx norkey serve
+NORKEY_PAYMASTER_ALLOW=all npx --no-install norkey serve
 ```
 
 - `NORKEY_PAYMASTER_<chainId>` adds a paymaster proxy route for that chain, at

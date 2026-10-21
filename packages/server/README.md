@@ -6,7 +6,7 @@ in your own database, SQLite or Postgres. It never receives a plaintext key. Run
 
 ```sh
 npm install @norkey/server
-NORKEY_RP_ID=localhost NORKEY_ORIGINS=http://localhost:5174 npx norkey serve
+NORKEY_RP_ID=localhost NORKEY_ORIGINS=http://localhost:5174 npx --no-install norkey serve
 ```
 
 Docs: the [quick start](https://github.com/xanderslabs/norkey/blob/main/docs/quickstart.md) and the

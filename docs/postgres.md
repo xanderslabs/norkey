@@ -21,7 +21,7 @@ Set `DATABASE_URL`. The server then uses Postgres and ignores `NORKEY_DB`:
 
 ```sh
 DATABASE_URL=postgres://norkey:norkey@localhost:54329/norkey \
-NORKEY_RP_ID=localhost NORKEY_ORIGINS=http://localhost:5174 npx norkey serve
+NORKEY_RP_ID=localhost NORKEY_ORIGINS=http://localhost:5174 npx --no-install norkey serve
 ```
 
 NorKey creates its tables on first use.

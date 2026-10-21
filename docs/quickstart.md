@@ -34,8 +34,11 @@ In `my-app`, start the server:
 
 ```sh
 NORKEY_RP_ID=localhost NORKEY_RP_NAME="My App" NORKEY_ORIGINS=http://localhost:5174 \
-NORKEY_APP_ORIGINS=http://localhost:5173 npx norkey serve
+NORKEY_APP_ORIGINS=http://localhost:5173 npx --no-install norkey serve
 ```
+
+The `--no-install` flag makes npx run only the package installed in this folder. It never downloads
+another package with the same name.
 
 The server prints `norkey listening on :8787`. It keeps its data in `./norkey.db`.
 
@@ -58,9 +61,9 @@ The answer is `{"mode":"passkey"}`.
 In a second terminal, in `my-app`, build the boundary page and serve it:
 
 ```sh
-npx norkey-vault build --rp-id localhost --api http://localhost:8787/norkey \
+npx --no-install norkey-vault build --rp-id localhost --api http://localhost:8787/norkey \
   --app-origin http://localhost:5173 --chains 11155111 --rp-name "My App"
-npx norkey-vault serve --port 5174
+npx --no-install norkey-vault serve --port 5174
 ```
 
 The build writes the page to `dist-vault`, with the settings baked in, and prints
