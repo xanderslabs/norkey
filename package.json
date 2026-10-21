@@ -8,6 +8,7 @@
     "test": "pnpm -r --filter \"./packages/*\" test",
     "typecheck": "pnpm -r --filter \"./packages/*\" typecheck",
     "lint": "biome check .",
+    "pack:smoke": "node scripts/pack-smoke.mjs",
     "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down -v"
   },
