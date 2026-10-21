@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # The full local gate, plus the prose check and the pack smoke.
+  # `pnpm build` runs before `pnpm typecheck` because the vault's page typecheck resolves
+  # @norkey/client from its dist folder.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      - run: pnpm build
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      # No em-dash, en-dash, ellipsis, arrow or curly quote in prose. The code points are written as
+      # \x{...} escapes so this file stays pure ASCII. grep exits 0 on a hit, which fails the step.
+      - name: No AI-punctuation tells in prose
+        env:
+          LC_ALL: C.UTF-8
+        run: |
+          if grep -rnP '[\x{2014}\x{2013}\x{2026}\x{2192}\x{2018}\x{2019}\x{201C}\x{201D}]' packages examples docs scripts README.md --include='*.ts' --include='*.mjs' --include='*.md' --include='*.html' --include='*.css' --include='*.json'; then
+            echo "::error::AI-punctuation tells found in the files above. Use plain punctuation."
+            exit 1
+          fi
+
+      - run: pnpm pack:smoke
+
+  # The server's storage and authorization tests against a real Postgres 17.
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: norkey
+          POSTGRES_PASSWORD: norkey
+          POSTGRES_DB: norkey
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U norkey -d norkey"
+          --health-interval 1s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+
+      - run: pnpm --filter @norkey/server test:pg
+        env:
+          DATABASE_URL: postgres://norkey:norkey@localhost:54329/norkey
+
+  # The three browser journeys on anvil forks of Sepolia and Unichain Sepolia.
+  # Each journey gets one retry. The known flakes are outside NorKey's code (a public RPC answering
+  # -32001, the mock paymaster or bundler failing to start), and the retry prints a warning, so it is
+  # logged and not hidden.
+  journeys:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: norkey
+          POSTGRES_PASSWORD: norkey
+          POSTGRES_DB: norkey
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U norkey -d norkey"
+          --health-interval 1s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - run: pnpm build
+
+      - run: pnpm --filter demo exec playwright-core install --with-deps chromium
+
+      - name: Run the journeys
+        env:
+          SEPOLIA_RPC: ${{ secrets.SEPOLIA_RPC }}
+          UNICHAIN_SEPOLIA_RPC: ${{ secrets.UNICHAIN_SEPOLIA_RPC }}
+        run: |
+          # An unset secret arrives as an empty string. The journeys read these variables with `??`,
+          # which keeps an empty string, so unset them to fall back to the public RPCs.
+          [ -n "$SEPOLIA_RPC" ] || unset SEPOLIA_RPC
+          [ -n "$UNICHAIN_SEPOLIA_RPC" ] || unset UNICHAIN_SEPOLIA_RPC
+
+          journey() {
+            if pnpm --filter demo "$1"; then
+              return 0
+            fi
+            echo "::warning::$1 failed once, retrying"
+            pnpm --filter demo "$1"
+          }
+
+          journey e2e
+          journey e2e:sponsored
+          DATABASE_URL=postgres://norkey:norkey@localhost:54329/norkey journey e2e:custom
