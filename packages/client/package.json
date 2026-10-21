@@ -1,6 +1,6 @@
 {
   "name": "@norkey/client",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser client for NorKey: an EIP-1193 wallet provider backed by a passkey wallet boundary page.",
   "type": "module",
   "license": "MIT",
@@ -37,7 +37,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "prepack": "tsc -p tsconfig.json"
   },
-  "dependencies": {
+  "peerDependencies": {
+    "viem": "^2.55.4"
+  },
+  "devDependencies": {
     "viem": "^2.55.4"
   }
 }

@@ -5,7 +5,7 @@ under your app's name. Each operation that needs the wallet key opens the bounda
 and the user approves it with a passkey.
 
 ```sh
-npm install @norkey/client
+npm install @norkey/client viem
 ```
 
 ```ts

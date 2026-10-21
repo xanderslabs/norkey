@@ -1,6 +1,6 @@
 {
   "name": "@norkey/vault",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Builds and serves the NorKey boundary page, the only place wallet keys are decrypted.",
   "type": "module",
   "license": "MIT",

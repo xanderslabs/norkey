@@ -13,6 +13,9 @@ every operation that needs the key.
 
 The two subpaths exist for `@norkey/vault`. An app needs only `@norkey/client`.
 
+`viem` is a peer dependency (`^2.55.4`). Install it in the app, next to `@norkey/client`, so the app
+has one copy of `viem`: the one its own wagmi or viem code uses.
+
 ## createNorKeyProvider
 
 ```ts

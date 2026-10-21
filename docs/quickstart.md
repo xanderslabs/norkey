@@ -23,8 +23,8 @@ Create a folder and install the three NorKey packages, wagmi, viem and Vite:
 ```sh
 mkdir my-app && cd my-app
 npm init -y
-npm install @norkey/client @norkey/server @norkey/vault
-npm install @wagmi/core viem
+npm install @norkey/client @norkey/server @norkey/vault viem
+npm install @wagmi/core
 npm install -D vite
 ```
 
