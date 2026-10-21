@@ -1,0 +1,63 @@
+# Publishes @norkey/client, @norkey/server and @norkey/vault when a tag vX.Y.Z is pushed.
+#
+# Founder setup, once, before the first tag: on npmjs.com, open each of the three packages, then
+# Settings, then Trusted Publisher, and add GitHub Actions with repo xanderslabs/norkey and workflow
+# release.yml. No npm token is stored. `id-token: write` lets a recent npm mint a short-lived
+# credential from GitHub's OIDC, and the same OIDC token carries the provenance attestation.
+# Without the Trusted Publishers, the publish step fails with an auth error.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+concurrency:
+  group: release-${{ github.ref_name }}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm CLI for OIDC publishing
+        run: npm install -g npm@latest
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Tag matches every package version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for pkg in client server vault; do
+            found=$(node -p "require('./packages/$pkg/package.json').version")
+            if [ "$found" != "$version" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match packages/$pkg/package.json version $found"
+              exit 1
+            fi
+          done
+
+      - run: pnpm lint
+
+      - run: pnpm build
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      - run: pnpm pack:smoke
+
+      - run: pnpm publish -r --no-git-checks
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
