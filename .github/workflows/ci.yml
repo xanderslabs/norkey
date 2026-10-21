@@ -99,6 +99,8 @@ jobs:
   # logged and not hidden.
   journeys:
     runs-on: ubuntu-latest
+    # The three journeys take a few minutes. A hang fails here instead of running for hours.
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17

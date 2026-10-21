@@ -36,7 +36,14 @@ export function createHarness() {
   let debug = async () => {};
 
   function start(cmd, args, env = {}) {
-    const p = spawn(cmd, args, { cwd: root, env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] });
+    // Own process group, so close() stops grandchildren too: on Linux, pnpm does not pass SIGTERM on
+    // to the Vite it starts, and a live Vite holds the pipes open and the journey never exits.
+    const p = spawn(cmd, args, {
+      cwd: root,
+      env: { ...process.env, ...env },
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+    });
     p.output = "";
     p.stdout.on("data", (d) => (p.output += d));
     p.stderr.on("data", (d) => (p.output += d));
@@ -140,7 +147,13 @@ export function createHarness() {
 
   async function close() {
     await browser?.close();
-    for (const p of procs) p.kill();
+    for (const p of procs) {
+      try {
+        process.kill(-p.pid, "SIGTERM");
+      } catch {
+        // The group already exited.
+      }
+    }
     rmSync(tmp, { recursive: true, force: true });
   }
 
