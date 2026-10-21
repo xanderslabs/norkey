@@ -1,21 +1,57 @@
 {
   "name": "@norkey/server",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "NorKey server: stores encrypted key wraps and passkey credentials in the app's own database.",
   "type": "module",
   "license": "MIT",
-  "bin": { "norkey": "./dist/serve.js" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xanderslabs/norkey.git",
+    "directory": "packages/server"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "norkey": "./dist/serve.js"
+  },
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./postgres": { "types": "./dist/postgres.d.ts", "import": "./dist/postgres.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./postgres": {
+      "types": "./dist/postgres.d.ts",
+      "import": "./dist/postgres.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:pg": "NORKEY_PG=1 vitest run --no-file-parallelism test/authz.test.ts test/storage.test.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "prepack": "tsc -p tsconfig.json"
   },
-  "dependencies": { "@simplewebauthn/server": "^13.3.3" },
-  "peerDependencies": { "postgres": "^3" },
-  "peerDependenciesMeta": { "postgres": { "optional": true } },
-  "devDependencies": { "postgres": "^3.4.9" }
+  "dependencies": {
+    "@simplewebauthn/server": "^13.3.3"
+  },
+  "peerDependencies": {
+    "postgres": "^3"
+  },
+  "peerDependenciesMeta": {
+    "postgres": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "postgres": "^3.4.9"
+  }
 }

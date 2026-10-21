@@ -1,17 +1,43 @@
 {
   "name": "@norkey/client",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Browser client for NorKey: an EIP-1193 wallet provider backed by a passkey wallet boundary page.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xanderslabs/norkey.git",
+    "directory": "packages/client"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./protocol": "./src/protocol.ts",
-    "./calibur": "./src/calibur.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js"
+    },
+    "./calibur": {
+      "types": "./dist/calibur.d.ts",
+      "import": "./dist/calibur.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "prepack": "tsc -p tsconfig.json"
   },
-  "dependencies": { "viem": "^2.55.4" }
+  "dependencies": {
+    "viem": "^2.55.4"
+  }
 }

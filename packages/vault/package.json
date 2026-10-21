@@ -1,24 +1,43 @@
 {
   "name": "@norkey/vault",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Builds and serves the NorKey boundary page, the only place wallet keys are decrypted.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xanderslabs/norkey.git",
+    "directory": "packages/vault"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "page",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
   "bin": {
     "norkey-vault": "./dist/bin.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.page.json"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.page.json",
+    "prepack": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",
+    "@norkey/client": "workspace:*",
     "qrcode": "1.5.4",
     "viem": "^2.55.4",
     "vite": "^8.1.5"
   },
   "devDependencies": {
-    "@norkey/client": "workspace:*",
     "@simplewebauthn/server": "^13.3.3",
     "@types/qrcode": "1.5.6",
     "jsdom": "^26.0.0"

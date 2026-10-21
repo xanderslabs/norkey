@@ -73,6 +73,9 @@ importers:
       '@noble/curves':
         specifier: ^2.2.0
         version: 2.4.0
+      '@norkey/client':
+        specifier: workspace:*
+        version: link:../client
       qrcode:
         specifier: 1.5.4
         version: 1.5.4
@@ -83,9 +86,6 @@ importers:
         specifier: ^8.1.5
         version: 8.3.2(@types/node@24.19.1)
     devDependencies:
-      '@norkey/client':
-        specifier: workspace:*
-        version: link:../client
       '@simplewebauthn/server':
         specifier: ^13.3.3
         version: 13.3.3

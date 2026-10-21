@@ -1,11 +1,8 @@
 import { parseArgs } from "node:util";
+import { CALIBUR_ADDRESS } from "@norkey/client/calibur";
 import { buildVault } from "./build.js";
 import { readLogo } from "./logo.js";
 import { serveVault } from "./serve-static.js";
-
-/** Uniswap's Calibur. Same value as CALIBUR_ADDRESS in @norkey/client/calibur; the CLI runs from dist
- *  and cannot import that TypeScript source. */
-const DEFAULT_CALIBUR = "0x000000005c84F8Fd50b21CAC312528A64437030e";
 
 const USAGE = `Usage:
   norkey-vault build --rp-id <id> --api <url> --app-origin <origin>[,<origin>] --chains <id>[,<id>]
@@ -18,7 +15,7 @@ export function parseChains(chains: string | undefined, overrides: string[] = []
   for (const part of chains.split(",")) {
     const id = Number(part.trim());
     if (!Number.isSafeInteger(id) || id <= 0) throw new Error(`--chains: "${part}" is not a chain id`);
-    map.set(id, DEFAULT_CALIBUR);
+    map.set(id, CALIBUR_ADDRESS);
   }
   for (const o of overrides) {
     const [id, address] = o.split("=");
