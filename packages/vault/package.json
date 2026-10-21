@@ -35,7 +35,7 @@
     "@norkey/client": "workspace:*",
     "qrcode": "1.5.4",
     "viem": "^2.55.4",
-    "vite": "^8.1.5"
+    "vite": "^8.3.4"
   },
   "devDependencies": {
     "@simplewebauthn/server": "^13.3.3",

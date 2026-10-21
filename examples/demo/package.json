@@ -16,10 +16,10 @@
     "viem": "^2.55.4"
   },
   "devDependencies": {
-    "vite": "^8.1.5",
-    "playwright-core": "^1.63.0",
     "@pimlico/alto": "0.0.21",
     "@pimlico/mock-paymaster": "0.0.8",
-    "prool": "0.0.25"
+    "playwright-core": "^1.63.0",
+    "prool": "0.0.25",
+    "vite": "^8.3.4"
   }
 }
