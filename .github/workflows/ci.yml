@@ -36,15 +36,25 @@ jobs:
       - run: pnpm test
 
       # No em-dash, en-dash, ellipsis, arrow or curly quote in prose. The code points are written as
-      # \x{...} escapes so this file stays pure ASCII. grep exits 0 on a hit, which fails the step.
+      # \x{...} escapes so this file stays pure ASCII. grep exits 0 on a hit and 1 on no match; any
+      # other status is an error, and the step fails closed on it.
       - name: No AI-punctuation tells in prose
         env:
           LC_ALL: C.UTF-8
         run: |
-          if grep -rnP '[\x{2014}\x{2013}\x{2026}\x{2192}\x{2018}\x{2019}\x{201C}\x{201D}]' packages examples docs scripts README.md --include='*.ts' --include='*.mjs' --include='*.md' --include='*.html' --include='*.css' --include='*.json'; then
-            echo "::error::AI-punctuation tells found in the files above. Use plain punctuation."
-            exit 1
-          fi
+          rc=0
+          grep -rnP '[\x{2014}\x{2013}\x{2026}\x{2192}\x{2018}\x{2019}\x{201C}\x{201D}]' packages examples docs scripts README.md --include='*.ts' --include='*.mjs' --include='*.md' --include='*.html' --include='*.css' --include='*.json' || rc=$?
+          case "$rc" in
+            1) ;;
+            0)
+              echo "::error::AI-punctuation tells found in the files above. Use plain punctuation."
+              exit 1
+              ;;
+            *)
+              echo "::error::the prose check failed to run (grep exited $rc)"
+              exit 1
+              ;;
+          esac
 
       - run: pnpm pack:smoke
 
