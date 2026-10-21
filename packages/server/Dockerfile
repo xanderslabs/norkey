@@ -7,4 +7,4 @@ RUN pnpm install --filter @norkey/server --frozen-lockfile && pnpm --filter @nor
 ENV NORKEY_DB=/data/norkey.db
 VOLUME /data
 EXPOSE 8787
-CMD ["node", "packages/server/dist/serve.js"]
+CMD ["node", "packages/server/dist/serve.js", "serve"]

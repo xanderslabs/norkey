@@ -2,6 +2,24 @@
 import { createServer } from "node:http";
 import { createNorKeyHandler, type NorKeyHandlerConfig, nodeListener, sqlite } from "./index.js";
 
+if (process.argv[2] !== "serve") {
+  console.error(`usage: norkey serve
+
+Environment variables:
+  NORKEY_RP_ID                    required. WebAuthn relying party ID.
+  NORKEY_ORIGINS                  required. Comma-separated origins of the boundary page.
+  NORKEY_RP_NAME                  relying party name.
+  NORKEY_APP_ORIGINS              comma-separated origins of your app.
+  NORKEY_COOKIE_DOMAIN            domain for the session cookie.
+  NORKEY_DB                       SQLite file path. Default ./norkey.db.
+  DATABASE_URL                    Postgres URL. Takes precedence over NORKEY_DB.
+  NORKEY_PORT                     listen port. Default 8787.
+  NORKEY_PAYMASTER_<chainId>      ERC-7677 paymaster URL for a chain.
+  NORKEY_PAYMASTER_CONTEXT_<chainId>  JSON context sent to that paymaster.
+  NORKEY_PAYMASTER_ALLOW          set to all to sponsor every signed-in user.`);
+  process.exit(1);
+}
+
 function required(name: string): string {
   const v = process.env[name];
   if (!v) {

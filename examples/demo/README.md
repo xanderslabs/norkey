@@ -16,7 +16,7 @@ Then start three processes from the repo root.
 
    ```sh
    NORKEY_RP_ID=localhost NORKEY_ORIGINS=http://localhost:5174 NORKEY_APP_ORIGINS=http://localhost:5173 \
-   NORKEY_DB=./demo.db node packages/server/dist/serve.js
+   NORKEY_DB=./demo.db node packages/server/dist/serve.js serve
    ```
 
    `NORKEY_APP_ORIGINS` lets the app's **Disconnect** end the server session.
@@ -237,7 +237,7 @@ Start the server with the paymaster for each chain, and allow the app origin to 
 ```sh
 NORKEY_RP_ID=localhost NORKEY_ORIGINS=http://localhost:5174 NORKEY_APP_ORIGINS=http://localhost:5173 \
 NORKEY_PAYMASTER_11155111=https://api.candide.dev/public/v3/11155111 \
-NORKEY_PAYMASTER_ALLOW=all NORKEY_DB=./demo.db node packages/server/dist/serve.js
+NORKEY_PAYMASTER_ALLOW=all NORKEY_DB=./demo.db node packages/server/dist/serve.js serve
 ```
 
 Then start the app with the sponsored chains listed:

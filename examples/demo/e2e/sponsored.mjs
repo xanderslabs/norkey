@@ -56,7 +56,7 @@ try {
     clearInterval(miner);
   }
   h.start("node", ["examples/demo/e2e/mock-paymaster.mjs"]);
-  h.start("node", ["packages/server/dist/serve.js"], {
+  h.start("node", ["packages/server/dist/serve.js", "serve"], {
     NORKEY_RP_ID: "localhost",
     NORKEY_ORIGINS: "http://localhost:5174",
     NORKEY_APP_ORIGINS: "http://localhost:5173",

@@ -31,7 +31,7 @@ try {
     "8546",
     "--silent",
   ]);
-  h.start("node", ["packages/server/dist/serve.js"], {
+  h.start("node", ["packages/server/dist/serve.js", "serve"], {
     NORKEY_RP_ID: "localhost",
     NORKEY_ORIGINS: "http://localhost:5174",
     NORKEY_DB: db,
