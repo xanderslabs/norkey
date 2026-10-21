@@ -39,8 +39,9 @@ export type NorKeyChain =
 export type NorKeyProviderConfig = {
   /** The boundary page origin, e.g. "https://accounts.app.com". */
   vaultOrigin: string;
-  /** The NorKey server handler's base, e.g. "/norkey", the same value the boundary page is built with
-   *  (`--api`). A relative URL resolves against the app page. Disconnect calls `<apiUrl>/logout`. */
+  /** The NorKey server handler's base, e.g. "/norkey". Point it at the same server handler as the
+   *  boundary page's `--api`. A relative URL resolves against the app page. Disconnect calls
+   *  `<apiUrl>/logout`. */
   apiUrl: string;
   chains: NorKeyChain[];
   defaultChainId: number;
@@ -49,7 +50,7 @@ export type NorKeyProviderConfig = {
   /** A `data:` URI. Defaults to a neutral wallet icon. */
   icon?: string;
   /** Names a new wallet's passkey in the browser's picker, e.g. the signed-in user's email. Called when
-   *  the connect popup opens. Missing or blank gives the server's `rpName` and 6 random hex characters. */
+   *  the connect popup opens. Missing or blank gives the server's `rpName`, then " wallet ", then 6 random hex characters. */
   label?: () => string | undefined;
 };
 
@@ -74,6 +75,9 @@ function validate(config: NorKeyProviderConfig): void {
   }
   if (typeof config.apiUrl !== "string" || config.apiUrl === "") {
     throw new Error('NorKey: apiUrl is required, e.g. "/norkey"');
+  }
+  if (typeof config.name !== "string" || config.name.trim() === "") {
+    throw new Error("NorKey: name is required");
   }
   if (!config.chains.some((c) => c.id === config.defaultChainId)) {
     throw new Error(`NorKey: defaultChainId ${config.defaultChainId} is not in chains`);

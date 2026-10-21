@@ -35,6 +35,7 @@ URL. It throws an `Error` whose message starts with `NorKey:` when:
 - The page is not a secure context. Serve the app over HTTPS or from `localhost`.
 - `vaultOrigin` parses as a URL but is not a bare origin.
 - `apiUrl` is missing or empty.
+- `name` is missing or blank.
 - `defaultChainId` is not the `id` of a chain in `chains`.
 - A chain has an empty `rpcUrls`.
 - A chain has `gas: "sponsored"` and no `paymasterUrl`.
