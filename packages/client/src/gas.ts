@@ -2,12 +2,12 @@ import type { Address, Hex, PublicClient } from "viem";
 import { type Call, encodeExecute } from "./calibur.js";
 
 /** Gas reserved for one EIP-7702 authorization. EIP-7702 sets 25,000 (PER_EMPTY_ACCOUNT_COST), but
- *  Sepolia measured about 43,350 on 2026-10-13 (NorKey-internal/probes/gas-estimate.md). Too little
- *  runs the first send out of gas; too much is refunded. */
+ *  Sepolia measured about 43,350 on 2026-10-13. Too little runs the first send out of gas; too much
+ *  is refunded. */
 const AUTH_GAS = 50_000n;
 /** Fallback when no state override works. Unused gas is refunded; the sender must hold gas * maxFee. */
 const FALLBACK_FLOOR = 1_000_000n;
-/** From NorKey-internal/probes/gas-estimate.md (Task 0). */
+/** The designator override estimated a Calibur batch on Sepolia and Unichain Sepolia (2026-10-13). */
 const OVERRIDE_FORM: "designator" | "runtime-code" | "none" = "designator";
 
 async function overrideCode(client: PublicClient, calibur: Address): Promise<Hex | undefined> {

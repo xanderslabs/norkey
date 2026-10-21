@@ -1,7 +1,7 @@
 import type { PaymasterProxyEntry } from "../config.js";
 
 /** EntryPoint v0.8, the one Calibur trusts unless the account changes it, which the boundary page
- *  refuses (NorKey-internal/probes/paymaster-7677.md, section 1). */
+ *  refuses. */
 const ENTRY_POINT_08 = "0x4337084d9e255ff0702461cf8895ce9e3b5ff108";
 const HASH = /^0x[0-9a-fA-F]{64}$/;
 /** These spend sponsorship, so `allow` decides them. */

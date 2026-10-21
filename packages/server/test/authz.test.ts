@@ -1,5 +1,5 @@
-// Why: the server's only security job in slice 1 is to never hand one user's wrap or wallet slot to
-// another user, and to refuse writes without a session. A wrap is ciphertext, but serving it to the
+// Why: the server must never hand one user's wrap or wallet slot to another user, and must refuse
+// writes without a session. A wrap is ciphertext, but serving it to the
 // wrong user still breaks the "only your passkey opens your wallet" boundary and enables row swaps.
 import { createHash, randomBytes } from "node:crypto";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";

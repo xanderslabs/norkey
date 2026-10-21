@@ -12,7 +12,7 @@ export class SessionExpiredError extends ProviderRpcError {
   }
 }
 
-/** A 65-byte signature of the right shape, so the gas estimate covers real verification. From Avok. */
+/** A 65-byte signature of the right shape, so the gas estimate covers real verification. */
 const STUB_SIGNATURE: Hex = `0x${"fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7"}${"7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7"}1b`;
 const GET_NONCE = parseAbi(["function getNonce(address sender, uint192 key) view returns (uint256)"]);
 
@@ -71,10 +71,11 @@ async function proxyRpc(url: string, method: string, params: unknown[]): Promise
   return body.result;
 }
 
-/** Stands in for the authorization until the boundary page signs the real one. Bundlers and paymasters
- *  accept it (NorKey-internal/probes/paymaster-7677.md, section 8). It leaves the userOpHash as it is:
- *  with no factory field, viem 2.57 hashes an empty initCode, so the hash covers no part of the
- *  authorization. */
+/** Stands in for the authorization until the boundary page signs the real one. Candide's public
+ *  bundler and paymaster on Sepolia, and Alto with Pimlico's mock paymaster, accept it. A state
+ *  override in its place does not work: Candide's paymaster refuses it. It leaves the userOpHash as
+ *  it is: with no factory field, viem 2.57 hashes an empty initCode, so the hash covers no part of
+ *  the authorization. */
 function placeholderAuthorization(calibur: Address, chainId: number, nonce: number): SignedAuthorization {
   return { address: calibur, chainId, nonce, r: `0x${"11".repeat(32)}`, s: `0x${"22".repeat(32)}`, yParity: 0 };
 }
@@ -147,7 +148,7 @@ export async function prepareUserOp(a: {
     callGasLimit: BigInt(gas.callGasLimit),
     verificationGasLimit: BigInt(gas.verificationGasLimit),
     preVerificationGas: BigInt(gas.preVerificationGas),
-    // The post-op limit stays the paymaster's: Alto's estimate returned 0x1 for it in the probe.
+    // The post-op limit stays the paymaster's: Alto's estimate returned 0x1 for it in testing.
     ...(gas.paymasterVerificationGasLimit
       ? { paymasterVerificationGasLimit: BigInt(gas.paymasterVerificationGasLimit) }
       : {}),

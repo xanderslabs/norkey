@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { ResolvedConfig } from "../config.js";
 
 const COOKIE = "norkey_session";
-/** Slice 4, decision 5: adding a passkey needs a session issued in the last 5 minutes. */
+/** Adding a passkey needs a session issued in the last 5 minutes, so an old stolen cookie cannot add one. */
 const FRESH_MS = 5 * 60 * 1000;
 const hash = (token: Uint8Array) => createHash("sha256").update(token).digest("hex");
 

@@ -149,7 +149,7 @@ export function validateUserOp(input: unknown, chains: PageConfig["chains"]): Pr
  * userOpHash itself; nothing in the request is a hash or an EntryPoint. Calibur checks a 65-byte
  * signature over userOpHash against the root key, with no prefix. On a first send it also signs the
  * authorization, to `calibur` from the page's build config, at the EOA's current nonce: the bundler
- * sends the outer transaction, so the EOA spends no nonce (probe, section 3).
+ * sends the outer transaction, so the EOA spends no nonce.
  */
 export async function signUserOp(
   key: Uint8Array,

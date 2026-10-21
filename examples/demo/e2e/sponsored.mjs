@@ -1,4 +1,4 @@
-// Slice 3 journey: sponsored gas. A fresh wallet sends through the NorKey paymaster proxy to a local
+// Sponsored gas journey. A fresh wallet sends through the NorKey paymaster proxy to a local
 // ERC-4337 stack (Alto and Pimlico's mock paymaster) on a Sepolia fork, and pays no gas.
 //
 // Why it matters: it is the only test of the whole sponsored path (provider, proxy, paymaster,
@@ -84,7 +84,7 @@ try {
   // 1. Create a wallet and give it 0.001 ETH, for the values it sends. Gas is the paymaster's.
   await page.click("#connect");
   await wallet().getByText("Create a new wallet").click();
-  // Slice 4: the backup offer comes before the popup replies.
+  // The backup offer comes before the popup replies.
   await wallet().getByRole("button", { name: "Skip" }).click();
   await page.waitForFunction(() => document.getElementById("address")?.textContent?.startsWith("0x"), null, {
     timeout: 30000,
@@ -116,8 +116,9 @@ try {
   console.log("2. sponsored first send: type 4 bundle from the executor, delegated, wallet paid only the value");
 
   // 2b. The operation reverts inside a bundle that lands: the wallet is emptied while the consent
-  // screen is open, after the estimate and the sponsorship (probe, section 10). eth_sendTransaction
-  // must throw, not return a bundle hash whose receipt says success (plan change 4).
+  // screen is open, after the estimate and the sponsorship. Alto accepts it, as it does not re-run
+  // execution at send time. eth_sendTransaction must throw, not return a bundle hash whose receipt
+  // says success.
   await dropOldPopups();
   await page.click("#send");
   await wallet().getByText("Your wallet pays no ETH for gas").waitFor();

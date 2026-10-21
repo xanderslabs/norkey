@@ -31,7 +31,7 @@ export function sqlite(path: string): NorKeyStorage {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
   db.exec(SCHEMA);
-  // A database made before slice 5 has no external_id column.
+  // A database made before custom auth mode existed has no external_id column.
   const userColumns = db.prepare("PRAGMA table_info(users)").all() as Row[];
   if (!userColumns.some((col) => col.name === "external_id")) db.exec("ALTER TABLE users ADD COLUMN external_id TEXT");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_external_id ON users(external_id)");

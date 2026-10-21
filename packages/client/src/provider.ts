@@ -157,7 +157,7 @@ export function createEip1193Provider(config: NorKeyProviderConfig): Eip1193Prov
     const reply: PopupReply = await openPopup(config.vaultOrigin, id, () => prepare(id));
     if (!reply.ok) {
       // The popup replies 4100 when the app's user is signed out (custom mode). Forget the address so
-      // the next app user does not get this one (slice 5, decision 15).
+      // the next app user does not get this one.
       if (reply.code === 4100) forgetAccount();
       throw new ProviderRpcError(reply.code, reply.message);
     }

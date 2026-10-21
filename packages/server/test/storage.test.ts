@@ -1,4 +1,4 @@
-// Why (spec section 8, test 2): a challenge that can be taken twice replays a login, and a wallet
+// Why: a challenge that can be taken twice replays a login, and a wallet
 // row without its wrap (or the reverse) is silent and can strand a key. Every adapter must keep
 // these properties, so this file runs against whichever adapter test/adapters.ts selects.
 import { mkdtemp, rm } from "node:fs/promises";
@@ -111,7 +111,7 @@ describe(`storage contract (${adapterName})`, () => {
     expect(await s.listCredentialIds("alice")).toEqual(["cred-a"]);
   });
 
-  it.skipIf(adapterName !== "sqlite")("adds external_id to a database made before slice 5", async () => {
+  it.skipIf(adapterName !== "sqlite")("adds external_id to a database made before custom auth mode", async () => {
     const dir = await mkdtemp(join(tmpdir(), "norkey-old-"));
     try {
       const path = join(dir, "old.db");

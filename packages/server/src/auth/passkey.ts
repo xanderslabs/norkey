@@ -44,8 +44,9 @@ function passkeyName(label: unknown, userID: Uint8Array, rpName: string): string
 }
 
 /** Creation options for a new user's first passkey. In custom mode, `existingUserId` is the app user's
- *  NorKey user when it has no wallet yet (slice 5, decision 7): the new passkey lands on that user.
- *  No excludeCredentials, so the user can retry in the provider that failed. */
+ *  NorKey user when it has no wallet yet: the new passkey lands on that user, so a create that stored
+ *  the user and then failed does not lock them out. No excludeCredentials, so the user can retry in
+ *  the provider that failed. */
 export async function registerOptions(config: ResolvedConfig, label?: unknown, existingUserId?: string) {
   const userID = existingUserId ? Buffer.from(existingUserId, "base64url") : randomBytes(16);
   const options = await generateRegistrationOptions({
@@ -70,7 +71,7 @@ export async function registerOptions(config: ResolvedConfig, label?: unknown, e
   return { challengeId, options };
 }
 
-/** Creation options for one more passkey on an existing user (slice 4). The user id is the account's,
+/** Creation options for one more passkey on an existing user. The user id is the account's,
  *  so the new passkey signs in to the same user. Every credential the user has is excluded, and no
  *  authenticatorAttachment is set, so another provider or a hardware key can hold the new one. */
 export async function addPasskeyOptions(config: ResolvedConfig, userId: string) {
@@ -189,7 +190,7 @@ export async function registerVerify(
 }
 
 /** Request options for a sign-in. In custom mode, `allowIds` is every credential of the app user's
- *  NorKey user, so the picker shows only those (slice 5, decision 6); `credentialId` narrows it only
+ *  NorKey user, so the picker shows only those; `credentialId` narrows it only
  *  if it is one of them. */
 export async function loginOptions(config: ResolvedConfig, credentialId?: string, allowIds?: string[]) {
   const allow = allowIds

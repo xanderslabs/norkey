@@ -90,7 +90,8 @@ export async function connectExisting(api: Api): Promise<{ address: Address }> {
       // A create that failed after registering this passkey left a user with no wallet. Finish setup
       // with this gesture's PRF output instead of sending the user off to make a second passkey.
       // That wrap is the wallet's only one, so a passkey from another device cannot make it: over the
-      // QR code its PRF value may differ from the one it gives on its own device (spec fact 1).
+      // QR code its PRF value may differ from the one it gives on its own device (Apple called such a
+      // mismatch on Safari 18.2 a bug).
       if (got.response.authenticatorAttachment === "cross-platform") throw new PasskeyError(CROSS_DEVICE_REJECTED);
       address = await createWalletUnder(api, {
         prfOutput: got.prfOutput,
@@ -156,8 +157,8 @@ export async function signIn(api: Api, credentialId?: string, local = true): Pro
   }
 }
 
-/** Creation options for one more passkey. The server needs a session from the last 5 minutes
- *  (decision 5). After a 401 the user signs in once more and the request is repeated. */
+/** Creation options for one more passkey. The server needs a session from the last 5 minutes, so an
+ *  old cookie cannot add one. After a 401 the user signs in once more and the request is repeated. */
 async function freshPasskeyOptions(api: Api) {
   try {
     return await api.passkeyOptions();
@@ -169,10 +170,11 @@ async function freshPasskeyOptions(api: Api) {
 }
 
 /**
- * Slice 4: wrap the same K under one more passkey. The new passkey is created and read first, and K
- * exists only inside the last gesture, which unlocks it with a passkey the wallet already has
- * (decision 3). The new wrap uses PRF output from a `get` on the new passkey, never the value at
- * create (decision 2). No prompt passes hints, so another provider or a hardware key can answer.
+ * Wrap the same K under one more passkey. The new passkey is created and read first, and K exists
+ * only inside the last gesture, which unlocks it with a passkey the wallet already has, so K never
+ * lives across two prompts. The new wrap uses PRF output from a `get` on the new passkey, never the
+ * value at create: a value at create that later differs would leave a wrap nothing can open. No
+ * prompt passes hints, so another provider or a hardware key can answer.
  */
 export async function addPasskey(api: Api, rpId: string, address: Address): Promise<void> {
   const { challengeId, options } = await freshPasskeyOptions(api);

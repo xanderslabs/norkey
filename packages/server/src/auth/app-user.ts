@@ -2,7 +2,7 @@ import type { ResolvedConfig } from "../config.js";
 import { readFreshSession, readSession } from "./session.js";
 
 /** The 401 error when the app's user is signed out. The boundary page matches it exactly and replies
- *  4100 (slice 5, decision 16). */
+ *  4100. */
 export const APP_SIGNED_OUT = "sign in to the app first";
 
 /** Custom mode only: the app's user id from `getUserId`, trimmed. Anything but a non-empty string
@@ -19,7 +19,7 @@ export async function readAppUser(config: ResolvedConfig, req: Request): Promise
 /** The NorKey session's user for a session-gated route. Built-in mode is `readSession` (or
  *  `readFreshSession` when `fresh`) and nothing else. Custom mode also needs the app's user, and its
  *  NorKey user must be the session's user, so a NorKey cookie left over from another app user, or
- *  from before the app signed out, opens nothing (slice 5, decision 5). */
+ *  from before the app signed out, opens nothing. */
 export async function gate(
   config: ResolvedConfig,
   req: Request,

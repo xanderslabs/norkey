@@ -1,8 +1,9 @@
 // Why: a user whose create failed after registering a passkey has no wallet, and "Use my passkey"
 // finishes setup by wrapping a new K under that gesture's PRF output. That wrap is the wallet's only
 // one. A passkey used from another device over the QR code may return a PRF value that differs from
-// the one it gives on its own device (spec fact 1), so a wallet finished that way could be one that
-// no gesture on the user's own device ever opens again. Funds sent to it would be lost.
+// the one it gives on its own device (Apple called such a mismatch on Safari 18.2 a bug), so a wallet
+// finished that way could be one that no gesture on the user's own device ever opens again. Funds
+// sent to it would be lost.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Api } from "../page/api.js";
 import { connectExisting } from "../page/flows.js";

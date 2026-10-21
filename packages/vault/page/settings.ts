@@ -1,7 +1,7 @@
 // The settings page: a direct visit to the boundary page, with no app behind it. A user signs in here
-// to add a passkey or export the wallet key (slice 4). It is the only module that imports export.ts
-// (guardrail test). Every passkey prompt here passes no hints, so another device's provider or a
-// hardware key can answer.
+// to add a passkey or export the wallet key. It is the only module that imports export.ts (guardrail
+// test). Every passkey prompt here passes no hints, so another device's provider or a hardware key can
+// answer.
 import type { Address } from "viem";
 import { createApi } from "./api.js";
 import { readConfig } from "./config.js";
@@ -28,7 +28,7 @@ function failed(e: unknown, back: () => void): void {
 async function start(): Promise<void> {
   showBusy("Waiting for your passkey...");
   try {
-    // Custom mode: the app's user must be signed in before NorKey's sign-in can work (slice 5).
+    // Custom mode: the app's user must be signed in before NorKey's sign-in can work.
     const status = await api.status();
     if (status.mode === "custom" && !status.signedIn) {
       showMessage("Sign in to the app first", "Open your app, sign in, then come back here.", [["Back", home]]);

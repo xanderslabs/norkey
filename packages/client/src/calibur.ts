@@ -11,8 +11,9 @@ import {
 import { entryPoint08Address, type UserOperation } from "viem/account-abstraction";
 import type { PreparedUserOp } from "./protocol.js";
 
-/** Uniswap's Calibur, the same runtime code on every chain NorKey supports
- *  (NorKey-internal/probes/calibur-addresses.md). The vault CLI repeats this default. */
+/** Uniswap's Calibur, the same runtime code on the eight chains checked: Ethereum, Base, Optimism,
+ *  Arbitrum One, BNB Chain, Unichain, Sepolia and Unichain Sepolia (the keccak of `cast code`
+ *  matched on each one on 2026-10-06). The vault CLI repeats this default. */
 export const CALIBUR_ADDRESS: Address = "0x000000005c84F8Fd50b21CAC312528A64437030e";
 
 /** Calibur's ERC-7821 mode BATCHED_CALL: every call must succeed or the whole batch reverts. */
@@ -35,7 +36,7 @@ export function isDelegatedTo(code: Hex | undefined, calibur: Address): boolean 
 }
 
 /** EntryPoint v0.8: Calibur trusts it unless the account calls updateEntryPoint, a self-call the
- *  boundary page refuses (NorKey-internal/probes/paymaster-7677.md, section 1). */
+ *  boundary page refuses. */
 export const ENTRY_POINT: Address = entryPoint08Address;
 
 /** Calibur's executeUserOp(PackedUserOperation,bytes32). The EntryPoint calls it, and Calibur decodes
@@ -44,7 +45,8 @@ const EXECUTE_USER_OP: Hex = "0x8dd7712f";
 const BATCHED_CALL = parseAbiParameters("((address to, uint256 value, bytes data)[] calls, bool revertOnFailure)");
 
 /** callData for a user operation. revertOnFailure is true, so the batch is atomic, as BATCHED_CALL
- *  mode is for a self-call. Not Avok's execute(MODE_BATCH, ...): the EntryPoint cannot call that. */
+ *  mode is for a self-call. Not execute(mode, ...): Calibur checks msg.sender there, so the EntryPoint
+ *  cannot call it. */
 export function encodeExecuteUserOp(calls: readonly Call[]): Hex {
   const batch = { calls: calls.map((c) => ({ to: c.to, value: c.value, data: c.data })), revertOnFailure: true };
   return concat([EXECUTE_USER_OP, encodeAbiParameters(BATCHED_CALL, [batch])]);
@@ -53,7 +55,8 @@ export function encodeExecuteUserOp(calls: readonly Call[]): Hex {
 /**
  * The user operation a PreparedUserOp describes. The boundary page hashes this and the provider
  * submits it, so neither can drift from the other. The authorization rides as eip7702Auth, with no
- * factory field (probe, section 6). The caller sets `signature`.
+ * factory field: Pimlico's mock paymaster refuses the 0x7702 factory marker, and every bundler tried
+ * accepts the operation without it. The caller sets `signature`.
  */
 export function userOperationFrom(p: PreparedUserOp, authorization?: SignedAuthorization): UserOperation<"0.8"> {
   return {

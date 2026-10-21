@@ -116,7 +116,7 @@ if (import.meta.env.VITE_CUSTOM_AUTH === "1") {
   });
   $("app-sign-out").addEventListener("click", async () => {
     // An app in custom mode disconnects NorKey on sign-out, so the next user does not get this
-    // user's address (slice 5, decision 15).
+    // user's address.
     try {
       await norkey.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] });
     } catch {}

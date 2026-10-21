@@ -1,9 +1,9 @@
-// Pack smoke test (slice 7 spec, section 8, test 1). A published npm version cannot be reused, so
+// Pack smoke test. A published npm version cannot be reused, so
 // this is the only check that runs the three packages the way a developer gets them: packed into
 // tarballs, installed with npm into an empty folder, then imported, built and started.
 //
 // Why it matters: the workspace links hide a missing `files` entry, a wrong `exports` path and an
-// undeclared dependency. This test fails on each of those before the founder publishes.
+// undeclared dependency. This test fails on each of those before a version is published.
 //
 // Needs the network: npm installs the third-party dependencies. Run it with `pnpm pack:smoke`.
 import { execFileSync, spawn } from "node:child_process";

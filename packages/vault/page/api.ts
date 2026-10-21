@@ -18,7 +18,7 @@ export class ApiError extends Error {
 }
 
 /** The server's 401 error when the app's user is signed out (custom mode). Matched exactly: the popup
- *  then replies 4100 (slice 5, decision 16). */
+ *  then replies 4100. */
 export const APP_SIGNED_OUT = "sign in to the app first";
 
 export function isAppSignedOut(e: unknown): boolean {

@@ -138,7 +138,7 @@ export async function getPasskey(
     }
     throw new NoPrfError();
   }
-  // Slice 4, decision 6: a passkey from another device or a hardware key goes on when it returns PRF
-  // output. The wrap's AES-GCM check then decides whether it opens the wallet.
+  // A passkey from another device or a hardware key goes on when it returns PRF output, so a USB or
+  // NFC security key can work. The wrap's AES-GCM check then decides whether it opens the wallet.
   return { response: authenticationJSON(assertion), prfOutput };
 }

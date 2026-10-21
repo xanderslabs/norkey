@@ -1,4 +1,5 @@
-// The popup: serves requests from the app that opened this page. It never imports settings.ts (slice 4).
+// The popup: serves requests from the app that opened this page. It never imports settings.ts, so no
+// popup request can reach export.
 import {
   type PopupReply,
   type PopupRequest,
@@ -46,7 +47,7 @@ const reject = (id: string) => () =>
 const caliburFor = (chainId: number) =>
   (config.chains.find((c) => c.id === chainId) as PageConfig["chains"][number]).calibur;
 
-/** Slice 4: after a new wallet is stored, offer a backup passkey. Resolves when the user is done, and
+/** After a new wallet is stored, offer a backup passkey. Resolves when the user is done, and
  *  the popup then replies with the address. An error here is shown, never thrown: the wallet exists. */
 function offerBackup(address: Address): Promise<void> {
   return new Promise((done) => {
@@ -82,8 +83,8 @@ function offerBackup(address: Address): Promise<void> {
   });
 }
 
-/** Connect. Built-in mode offers create or unlock, as before slice 5. Custom mode asks the server who
- *  the app's user is and goes straight to the one step that fits (slice 5, section 6). */
+/** Connect. Built-in mode offers create or unlock. Custom mode asks the server who the app's user is
+ *  and goes straight to the one step that fits. */
 async function connect(req: PopupRequest & { kind: "connect" }, origin: string): Promise<void> {
   const cancel = reject(req.id);
   /** `recover` handles an error itself and returns true, or returns false to reply with it. */
@@ -139,7 +140,7 @@ async function connect(req: PopupRequest & { kind: "connect" }, origin: string):
     return;
   }
   // A user with no wallet is an earlier create that stopped after registering the passkey. When that
-  // passkey cannot finish setup here, a new passkey joins the same NorKey user (decision 7).
+  // passkey cannot finish setup here, a new passkey joins the same NorKey user.
   const orphan = !status.hasWallet;
   const existing = run(
     () => connectExisting(api),
@@ -160,7 +161,7 @@ async function connect(req: PopupRequest & { kind: "connect" }, origin: string):
       return true;
     },
   );
-  // A user with a wallet may have saved the passkey on another device (slice 5, section 6).
+  // A user with a wallet may have saved the passkey on another device.
   const unlockText = orphan
     ? "Use the passkey you saved for this account."
     : "Use the passkey you saved for this account. If it is on another device, use a synced passkey or your phone over the QR code.";

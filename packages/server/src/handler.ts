@@ -98,7 +98,7 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
         if ("error" in signedIn) return json(401, { error: signedIn.error });
         const { userId, externalId } = signedIn;
         const wallet = await config.storage.getWallet(userId);
-        // No wallet answers 401 too: "connect again" finishes an orphaned setup (slice 2).
+        // No wallet answers 401 too: "connect again" finishes an orphaned setup.
         if (!wallet) return json(401, { error: "not signed in" });
         const r = await proxyPaymaster(entry, { chainId, userId, externalId, address: wallet.address, body });
         return json(r.status, r.body);
@@ -115,7 +115,7 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
         case "POST /register/options": {
           if (!appUser) return json(200, await registerOptions(config, body.label));
           const mapped = await config.storage.getUserIdByExternalId(appUser);
-          // One wallet per app user (slice 5, decision 7): the page goes to unlock instead.
+          // One wallet per app user: the page goes to unlock instead.
           if (mapped && (await config.storage.getWallet(mapped))) {
             return json(409, { error: "this account already has a wallet" });
           }
@@ -139,7 +139,7 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
         }
         case "POST /login/verify": {
           const { userId, credentialId } = await loginVerify(config, String(body.challengeId), body.response as never);
-          // Two app accounts on one device: the passkey must be the app user's own (slice 5, decision 6).
+          // Two app accounts on one device: the passkey must be the app user's own.
           if (appUser && (await config.storage.getUserIdByExternalId(appUser)) !== userId) {
             return json(403, { error: "this passkey belongs to another account" });
           }
@@ -154,7 +154,7 @@ export function createNorKeyHandler(input: NorKeyHandlerConfig): (req: Request) 
           return json(r.status, r.body);
         }
         case "POST /passkeys/options": {
-          // Slice 4, decision 5: a session issued in the last 5 minutes, so an old cookie cannot add one.
+          // A session issued in the last 5 minutes, so an old cookie cannot add one.
           const signedIn = await gate(config, req, true);
           if ("error" in signedIn) return json(401, { error: addPasskeyError(signedIn.error) });
           if (!(await config.storage.getWallet(signedIn.userId))) return json(409, { error: "no wallet" });

@@ -1,7 +1,7 @@
-// The export screen, ported from Avok (62fbcdd). Only settings.ts imports it, so no popup request can
-// reach it (guardrail test). One passkey gesture unlocks K; the hex string is the only copy kept, and
-// withUnlockedKey zeroes the key bytes. Leaving the screen, Hide, or 60 seconds idle wipes the hex and
-// the QR and returns to the warnings.
+// The export screen. Only settings.ts imports it, so no popup request can reach it (guardrail test).
+// One passkey gesture unlocks K; the hex string is the only copy kept, and withUnlockedKey zeroes the
+// key bytes. Leaving the screen, Hide, or 60 seconds idle wipes the hex and the QR and returns to the
+// warnings.
 import { toCanvas } from "qrcode";
 import { type Address, bytesToHex } from "viem";
 import type { Api } from "./api.js";

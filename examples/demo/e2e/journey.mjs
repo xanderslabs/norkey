@@ -1,6 +1,6 @@
-// Slice 1 journey: create a wallet, check the server holds only ciphertext, fund it on a Sepolia
-// fork, send ETH with a passkey approval, then reconnect with the existing passkey. Slice 4 (steps 9
-// to 11): add a second passkey on the settings page, send with it, and export the key.
+// Built-in mode journey: create a wallet, check the server holds only ciphertext, fund it on a
+// Sepolia fork, send ETH with a passkey approval, then reconnect with the existing passkey. Steps 9 to
+// 11: add a second passkey on the settings page, send with it, and export the key.
 //
 // Why it matters: this is the only test that runs the real flow end to end (server WebAuthn
 // verification, PRF, wrap, boundary page under its CSP, provider, signing, broadcast). Low unit
@@ -53,7 +53,7 @@ try {
   // 1. Create a wallet.
   await page.click("#connect");
   await wallet().getByText("Create a new wallet").click();
-  // Slice 4: the backup offer comes before the popup replies. Skipped here; step 9 adds a passkey.
+  // The backup offer comes before the popup replies. Skipped here; step 9 adds a passkey.
   await wallet().getByRole("button", { name: "Skip" }).click();
   await page.waitForFunction(() => document.getElementById("address")?.textContent?.startsWith("0x"), null, {
     timeout: 30000,
@@ -169,7 +169,7 @@ try {
   console.log("8. blocked popup: 4001");
 
   // 9. Add a second passkey on the settings page, on a second virtual authenticator: a USB security
-  // key with PRF, so its assertions say "cross-platform" (slice 4, decision 6). Test-only: two
+  // key with PRF, so its assertions say "cross-platform", which sign-in accepts. Test-only: two
   // authenticators would both answer a prompt. Before each prompt on the boundary page, the hook
   // leaves user presence on only for the authenticator that holds an allowed credential, or for
   // `active` when the prompt allows any.

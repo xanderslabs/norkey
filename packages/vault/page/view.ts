@@ -54,7 +54,7 @@ export function showMessage(title: string, message: string, actions: [string, ()
   );
 }
 
-/** The rule every backup screen states (slice 4). */
+/** The rule every backup screen states. */
 const LOSS_RULE =
   "Each passkey you add can open this wallet. If you lose every passkey and never exported your key, the wallet is lost.";
 

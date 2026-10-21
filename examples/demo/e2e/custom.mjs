@@ -1,8 +1,8 @@
-// Slice 5 journey (spec section 8, test 4): custom auth mode on Postgres. The app's own sign-in
-// decides who the user is. Steps: signed out, connect rejects with 4100; app user alice creates a
-// wallet, sends, and adds a second passkey; alice signs out and bob signs in, and connect opens the
-// popup instead of returning alice's address; bob's app cookie with alice's NorKey cookie opens
-// nothing; alice signs back in and unlocks the same wallet.
+// Custom auth mode journey, on Postgres. The app's own sign-in decides who the user is. Steps:
+// signed out, connect rejects with 4100; app user alice creates a wallet, sends, and adds a second
+// passkey; alice signs out and bob signs in, and connect opens the popup instead of returning alice's
+// address; bob's app cookie with alice's NorKey cookie opens nothing; alice signs back in and unlocks
+// the same wallet.
 //
 // Why it matters: this is the only test that runs custom mode end to end (getUserId on the app's
 // cookie, the Postgres adapter, the page's custom-mode screens, and the provider forgetting the
