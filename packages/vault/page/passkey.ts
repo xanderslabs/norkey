@@ -11,7 +11,7 @@ import { PRF_INPUT } from "./wrap.js";
 
 export class NoPrfError extends Error {
   constructor() {
-    super("This passkey provider cannot unlock a NorKey wallet. Try iCloud Keychain or Google Password Manager.");
+    super("This passkey provider cannot unlock this wallet. Try iCloud Keychain or Google Password Manager.");
     this.name = "NoPrfError";
   }
 }

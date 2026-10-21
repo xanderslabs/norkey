@@ -2,6 +2,8 @@
 @media (prefers-color-scheme: dark) { :root { --fg: #eee; --bg: #111; --muted: #999; --line: #333; --accent: #eee; --err: #ff6b81; } }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+header { display: flex; align-items: center; gap: 10px; max-width: 420px; margin: 0 auto; padding: 24px 16px 0; font-size: 20px; font-weight: 600; }
+header img { height: 28px; width: auto; }
 main { max-width: 420px; margin: 0 auto; padding: 24px 16px; }
 h1 { font-size: 20px; margin: 0 0 8px; }
 p { margin: 0 0 16px; }

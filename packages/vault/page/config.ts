@@ -2,6 +2,8 @@
 export type PageConfig = {
   rpId: string;
   rpName: string;
+  /** A `data:` URI shown in the header. */
+  logo?: string;
   apiUrl: string;
   appOrigins: string[];
   /** The chains this page signs for, each with the only address it will delegate to. */

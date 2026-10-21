@@ -1,5 +1,6 @@
 import type { PreparedCalls } from "@norkey/client/protocol";
 import { formatEther } from "viem";
+import { readConfig } from "./config.js";
 import { chainName, describeCall } from "./decode.js";
 
 const root = () => document.getElementById("app") as HTMLElement;
@@ -86,7 +87,7 @@ export function showBackupOffer(actions: { add: () => void; skip: () => void }) 
 export function showConnect(origin: string, actions: { create: () => void; existing: () => void; cancel: () => void }) {
   screen(
     el("h1", "Connect a wallet"),
-    el("p", `${origin} wants to connect a NorKey wallet.`),
+    el("p", `${origin} wants to connect your ${readConfig().rpName} wallet.`),
     button("Create a new wallet", actions.create, true),
     button("Use my passkey", actions.existing),
     button("Cancel", actions.cancel),

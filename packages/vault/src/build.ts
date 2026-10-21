@@ -9,6 +9,8 @@ import { buildCsp, headersFileContent, securityHeaders } from "./headers.js";
 export type BuildConfig = {
   rpId: string;
   rpName: string;
+  /** A `data:` URI for the header image, from `readLogo`. */
+  logo?: string;
   apiUrl: string;
   appOrigins: string[];
   chains: { id: number; calibur: `0x${string}` }[];

@@ -30,9 +30,9 @@ export class ConflictError extends Error {
 }
 
 /** The passkey's display name in the browser's picker. The app's label, trimmed, without control or
- *  bidirectional control characters, at most 64 characters. Empty or missing gives "NorKey wallet"
+ *  bidirectional control characters, at most 64 characters. Empty or missing gives "<rpName> wallet"
  *  and the first 6 hex characters of the random user id. Display only: not unique, not stored. */
-function passkeyName(label: unknown, userID: Uint8Array): string {
+function passkeyName(label: unknown, userID: Uint8Array, rpName: string): string {
   const clean =
     typeof label === "string"
       ? Array.from(label.replace(/[\p{Cc}\p{Bidi_Control}]/gu, "").trim())
@@ -40,7 +40,7 @@ function passkeyName(label: unknown, userID: Uint8Array): string {
           .join("")
           .trim()
       : "";
-  return clean || `NorKey wallet ${Buffer.from(userID).toString("hex").slice(0, 6)}`;
+  return clean || `${rpName} wallet ${Buffer.from(userID).toString("hex").slice(0, 6)}`;
 }
 
 /** Creation options for a new user's first passkey. In custom mode, `existingUserId` is the app user's
@@ -51,7 +51,7 @@ export async function registerOptions(config: ResolvedConfig, label?: unknown, e
   const options = await generateRegistrationOptions({
     rpName: config.rpName ?? config.rpId,
     rpID: config.rpId,
-    userName: passkeyName(label, userID),
+    userName: passkeyName(label, userID, config.rpName ?? config.rpId),
     userID,
     attestationType: "none",
     authenticatorSelection: {
@@ -78,7 +78,7 @@ export async function addPasskeyOptions(config: ResolvedConfig, userId: string) 
   const options = await generateRegistrationOptions({
     rpName: config.rpName ?? config.rpId,
     rpID: config.rpId,
-    userName: passkeyName(undefined, userID),
+    userName: passkeyName(undefined, userID, config.rpName ?? config.rpId),
     userID,
     attestationType: "none",
     excludeCredentials: (await config.storage.listCredentialIds(userId)).map((id) => ({ id })),

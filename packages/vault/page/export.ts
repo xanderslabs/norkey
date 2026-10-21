@@ -13,7 +13,7 @@ const IDLE_WIPE_MS = 60_000;
 const WARNINGS = [
   "This is your wallet's private key. Anyone who has it controls your wallet on every chain, forever. It cannot be revoked or changed. After a leak, the only remedy is to move your assets to a new wallet.",
   "Export works only while this app's domain is online. If the app goes away, export cannot help anyone afterwards. Do it before.",
-  "Neither the app nor NorKey sees this key. Do not paste it anywhere you would not paste your bank password.",
+  "Neither the app nor its server sees this key. Do not paste it anywhere you would not paste your bank password.",
 ];
 
 export function showExport(api: Api, address: Address, back: () => void): void {

@@ -311,7 +311,7 @@ describe("sessions", () => {
 });
 
 describe("passkey names", () => {
-  it("names the passkey with the app's label, or NorKey wallet and 6 hex characters of the user id", async () => {
+  it("names the passkey with the app's label, or the rpName and 6 hex characters of the user id", async () => {
     // Why: the browser's passkey picker shows this name. If every wallet has the same name, a user
     // with two wallets cannot tell which one they are about to unlock.
     const { post } = await setup();
@@ -323,7 +323,8 @@ describe("passkey names", () => {
     expect((await user({ label: "x".repeat(100) })).name).toBe("x".repeat(64));
     for (const body of [{}, { label: " \u0000 " }, { label: 42 }]) {
       const { id, name } = await user(body);
-      expect(name).toBe(`NorKey wallet ${Buffer.from(id, "base64url").toString("hex").slice(0, 6)}`);
+      // The test config sets no rpName, so the name falls back to rpId.
+      expect(name).toBe(`localhost wallet ${Buffer.from(id, "base64url").toString("hex").slice(0, 6)}`);
     }
   });
 });

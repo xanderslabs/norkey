@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import { buildVault } from "./build.js";
+import { readLogo } from "./logo.js";
 import { serveVault } from "./serve-static.js";
 
 /** Uniswap's Calibur. Same value as CALIBUR_ADDRESS in @norkey/client/calibur; the CLI runs from dist
@@ -8,7 +9,7 @@ const DEFAULT_CALIBUR = "0x000000005c84F8Fd50b21CAC312528A64437030e";
 
 const USAGE = `Usage:
   norkey-vault build --rp-id <id> --api <url> --app-origin <origin>[,<origin>] --chains <id>[,<id>]
-                     [--calibur <id>=<address>]... [--rp-name <name>] [--out dist-vault]
+                     [--calibur <id>=<address>]... [--rp-name <name>] [--logo <file>] [--out dist-vault]
   norkey-vault serve [--dir dist-vault] [--port 5174]`;
 
 export function parseChains(chains: string | undefined, overrides: string[] = []) {
@@ -35,6 +36,7 @@ export async function runCli(argv: string[]): Promise<void> {
     options: {
       "rp-id": { type: "string" },
       "rp-name": { type: "string" },
+      logo: { type: "string" },
       api: { type: "string" },
       "app-origin": { type: "string" },
       chains: { type: "string" },
@@ -53,7 +55,12 @@ export async function runCli(argv: string[]): Promise<void> {
       if (new URL(o).origin !== o) throw new Error(`--app-origin "${o}" must be a bare origin`);
     }
     const chains = parseChains(values.chains, values.calibur);
-    const built = await buildVault({ rpId, rpName: values["rp-name"] ?? rpId, apiUrl, appOrigins, chains }, values.out);
+    // Read the logo first, so a bad file writes nothing.
+    const logo = values.logo ? await readLogo(values.logo) : undefined;
+    const built = await buildVault(
+      { rpId, rpName: values["rp-name"] ?? rpId, apiUrl, appOrigins, chains, ...(logo ? { logo } : {}) },
+      values.out,
+    );
     console.log(`norkey-vault: wrote ${values.out}/index.html and _headers`);
     console.log(`chains: ${chains.map((c) => `${c.id} -> ${c.calibur}`).join(", ")}`);
     console.log(`CSP: ${built.csp}`);
