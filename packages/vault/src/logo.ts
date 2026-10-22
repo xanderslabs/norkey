@@ -8,7 +8,12 @@ const MAX_BYTES = 64 * 1024;
 export async function readLogo(path: string): Promise<string> {
   const mime = MIME[extname(path).toLowerCase()];
   if (!mime) throw new Error(`--logo ${path}: use an .svg, .png or .webp file`);
-  const bytes = await readFile(path);
+  let bytes: Buffer;
+  try {
+    bytes = await readFile(path);
+  } catch (e) {
+    throw new Error(`--logo ${path}: cannot read the file (${(e as NodeJS.ErrnoException).code ?? "unknown error"})`);
+  }
   if (bytes.length > MAX_BYTES) throw new Error(`--logo ${path}: ${bytes.length} bytes, the limit is 64 KiB`);
   return `data:${mime};base64,${bytes.toString("base64")}`;
 }

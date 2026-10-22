@@ -30,7 +30,7 @@ hashes the final bytes into the Content Security Policy.
 | `--chains <id>[,<id>]` | Yes | | The chain ids the page signs for, comma-separated. Each must be a positive integer. |
 | `--calibur <id>=<address>` | No | `0x000000005c84F8Fd50b21CAC312528A64437030e` | The delegate address for one chain in `--chains`. Repeat the flag for more chains. The page delegates only to this address. |
 | `--rp-name <name>` | No | The `--rp-id` value | The app's name. The page shows it in its title (`<rp-name> wallet`), in a header above every screen, and in the connect line ("`<origin>` wants to connect your `<rp-name>` wallet."). |
-| `--logo <file>` | No | None | An image shown in the page header. Accepted extensions: `.svg`, `.png`, `.webp`. At most 64 KiB. The file is read at build time and inlined as a `data:` URI. Another type or a larger file stops the build before anything is written. |
+| `--logo <file>` | No | None | An image shown in the page header. Accepted extensions: `.svg`, `.png`, `.webp`. At most 64 KiB. The file is read at build time and inlined as a `data:` URI. Another type, a larger file or a file that cannot be read stops the build before anything is written. |
 | `--out <dir>` | No | `dist-vault` | The output folder. Its contents are replaced. |
 
 ### Output
