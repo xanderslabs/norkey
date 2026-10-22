@@ -17,6 +17,13 @@
     "README.md",
     "LICENSE"
   ],
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "protocol": ["dist/protocol.d.ts"],
+      "calibur": ["dist/calibur.d.ts"]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

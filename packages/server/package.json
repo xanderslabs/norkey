@@ -23,6 +23,12 @@
   "bin": {
     "norkey": "./dist/serve.js"
   },
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "postgres": ["dist/postgres.d.ts"]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
