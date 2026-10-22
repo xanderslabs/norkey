@@ -68,23 +68,26 @@ async function collect(dir: string, base = dir): Promise<Map<string, string>> {
 export async function buildVault(config: BuildConfig, outDir: string): Promise<BuiltPage> {
   const staging = join(tmpdir(), `norkey-vault-${process.pid}`);
   await rm(staging, { recursive: true, force: true });
-  await viteBuild({
-    root: fileURLToPath(new URL("../page", import.meta.url)),
-    base: "./",
-    logLevel: "warn",
-    build: {
-      outDir: staging,
-      emptyOutDir: true,
-      // One chunk: split output leaves modulepreload links the inliner does not fold in.
-      rollupOptions: { output: { codeSplitting: false } },
-    },
-  });
-  const built = inlinePage(await readFile(join(staging, "index.html"), "utf8"), await collect(staging), config);
-  await rm(outDir, { recursive: true, force: true });
-  await mkdir(outDir, { recursive: true });
-  await writeFile(join(outDir, "index.html"), built.html);
-  await writeFile(join(outDir, "_headers"), headersFileContent(built.headers));
-  await writeFile(join(outDir, "headers.json"), `${JSON.stringify(built.headers, null, 2)}\n`);
-  await rm(staging, { recursive: true, force: true });
-  return built;
+  try {
+    await viteBuild({
+      root: fileURLToPath(new URL("../page", import.meta.url)),
+      base: "./",
+      logLevel: "warn",
+      build: {
+        outDir: staging,
+        emptyOutDir: true,
+        // One chunk: split output leaves modulepreload links the inliner does not fold in.
+        rollupOptions: { output: { codeSplitting: false } },
+      },
+    });
+    const built = inlinePage(await readFile(join(staging, "index.html"), "utf8"), await collect(staging), config);
+    await rm(outDir, { recursive: true, force: true });
+    await mkdir(outDir, { recursive: true });
+    await writeFile(join(outDir, "index.html"), built.html);
+    await writeFile(join(outDir, "_headers"), headersFileContent(built.headers));
+    await writeFile(join(outDir, "headers.json"), `${JSON.stringify(built.headers, null, 2)}\n`);
+    return built;
+  } finally {
+    await rm(staging, { recursive: true, force: true });
+  }
 }
