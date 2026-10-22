@@ -5,9 +5,10 @@
 #   GitHub Actions with repo xanderslabs/norkey, workflow release.yml and environment npm.
 # - On GitHub, create the environment npm (repo Settings, then Environments) and require the
 #   founder's approval on it. The publish job waits for that approval.
-# No npm token is stored. `id-token: write` lets a recent npm mint a short-lived credential from
-# GitHub's OIDC, and the same OIDC token carries the provenance attestation. Without the Trusted
-# Publishers, the publish step fails with an auth error.
+# - Until npm/cli#9969 is fixed: store a granular npm token (read-write on the three packages only,
+#   short expiry) as the secret NPM_TOKEN on the npm environment. See the publish step.
+# `id-token: write` lets npm sign the provenance attestation with GitHub's OIDC, and lets a recent npm
+# mint a short-lived publish credential once npm accepts this repo's OIDC tokens.
 name: Release
 
 on:
@@ -92,6 +93,12 @@ jobs:
 
       - run: pnpm pack:smoke
 
+      # npm's registry refuses the OIDC token exchange for repos with GitHub's immutable OIDC subject
+      # claims (npm/cli#9969), which includes this one. Until npm fixes it, the publish authenticates
+      # with NPM_TOKEN: a granular token for the three packages, stored only on the npm environment.
+      # Provenance still comes from GitHub OIDC. The Trusted Publishers stay configured; drop the
+      # token once the exchange works.
       - run: pnpm publish -r --no-git-checks
         env:
           NPM_CONFIG_PROVENANCE: "true"
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
