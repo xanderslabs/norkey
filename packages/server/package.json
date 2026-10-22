@@ -1,6 +1,6 @@
 {
   "name": "@norkey/server",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "NorKey server: stores encrypted key wraps and passkey credentials in the app's own database.",
   "type": "module",
   "license": "MIT",

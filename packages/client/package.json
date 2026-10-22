@@ -1,6 +1,6 @@
 {
   "name": "@norkey/client",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Browser client for NorKey: an EIP-1193 wallet provider backed by a passkey wallet boundary page.",
   "type": "module",
   "license": "MIT",
