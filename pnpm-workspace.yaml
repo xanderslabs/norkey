@@ -1,3 +1,9 @@
 packages:
   - packages/*
   - examples/*
+
+# Patched versions for the demo's local test bundler (@pimlico/alto, prool), which still pins the
+# vulnerable ones. Dev-only: nothing here ships in a published package.
+overrides:
+  tar: ^7.5.22
+  uuid: ^11.1.1
